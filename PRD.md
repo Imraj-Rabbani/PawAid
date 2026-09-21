@@ -759,13 +759,9 @@ Amount: ৳2,500
 Description:
 Veterinary medicine and treatment
 
-Receipt:
-[Uploaded Receipt]
 ```
 
-Receipts should be uploaded and associated with the relevant transaction/order.
 
-This provides an audit trail for rescue expenditures.
 
 ---
 

@@ -120,7 +120,7 @@ erDiagram
     WALLET {
         uuid id PK
         uuid volunteer_id FK
-        bigint balance
+        int balance
         datetime updated_at
     }
 
@@ -128,7 +128,7 @@ erDiagram
         uuid id PK
         uuid wallet_id FK
         uuid related_transaction_id FK
-        bigint amount
+        int amount
         string type
         string reference
         datetime created_at
@@ -193,8 +193,8 @@ erDiagram
 
     RESCUE_FUND {
         uuid id PK
-        bigint total_available
-        bigint total_used
+        int total_available
+        int total_used
         datetime updated_at
     }
 

@@ -1,0 +1,455 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ========================================
+// ENUMS
+// ========================================
+
+enum UserRole {
+  USER
+  VOLUNTEER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum VolunteerStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RescuePostStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum PostReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+enum DonationDestinationType {
+  RESCUE_POST
+  VOLUNTEER
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BKASH
+  NAGAD
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum FinancialTransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  DONATION
+  ORDER_PAYMENT
+  REFUND
+}
+
+enum FinancialTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+// ========================================
+// USER
+// ========================================
+
+model User {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  email     String     @unique
+  password  String
+  role      UserRole   @default(USER)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  volunteerProfile VolunteerProfile?
+  rescuePosts RescuePost[] @relation("PostCreator")
+  comments Comment[]
+  postReports PostReport[]
+  donations Donation[]
+  orders Order[]
+  financialTransactions FinancialTransaction[] @relation("RelatedUser")
+  @@map("users")
+}
+// ========================================
+// RESCUE AREA
+// ========================================
+
+model RescueArea {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique
+  volunteers VolunteerProfile[]
+  rescuePosts RescuePost[]
+  @@map("rescue_areas")
+}
+// ========================================
+// VOLUNTEER PROFILE
+// ========================================
+
+model VolunteerProfile {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  rescueAreaId String @map("rescue_area_id") @db.Uuid
+  phone String
+  address String
+  profilePictureUrl String? @map("profile_picture_url")
+  nid String? @unique
+  description String?
+  status VolunteerStatus @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])
+  wallet Wallet?
+  assignedPosts RescuePost[] @relation("AssignedVolunteer")
+  donations Donation[]
+  expenses RescueExpense[]
+  financialTransactions FinancialTransaction[] @relation("RelatedVolunteer")
+  @@index([rescueAreaId])
+  @@map("volunteer_profiles")
+}
+// ========================================
+// RESCUE POST
+// ========================================
+
+model RescuePost {
+  id String @id @default(uuid()) @db.Uuid
+  creatorId String @map("creator_id") @db.Uuid
+  rescueAreaId String @map("rescue_area_id") @db.Uuid
+  assignedVolunteerId String? @map("assigned_volunteer_id") @db.Uuid
+  title String
+  description String
+  donationTarget Int @default(0) @map("donation_target")
+  donationReceived Int @default(0) @map("donation_received")
+  status RescuePostStatus @default(OPEN)
+  createdAt DateTime @default(now()) @map("created_at")
+  creator User @relation("PostCreator", fields: [creatorId], references: [id])
+  rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])
+  assignedVolunteer VolunteerProfile? @relation("AssignedVolunteer", fields: [assignedVolunteerId], references: [id])
+  images RescuePostImage[]
+  comments Comment[]
+  reports PostReport[]
+  donations Donation[]
+  expenses RescueExpense[]
+  financialTransactions FinancialTransaction[] @relation("RelatedPost")
+  @@index([creatorId])
+  @@index([rescueAreaId])
+  @@index([assignedVolunteerId])
+  @@map("rescue_posts")
+}
+
+// ========================================
+// RESCUE POST IMAGE
+// ========================================
+
+model RescuePostImage {
+  id String @id @default(uuid()) @db.Uuid
+  rescuePostId String @map("rescue_post_id") @db.Uuid
+  imageUrl String @map("image_url")
+  rescuePost RescuePost @relation(fields: [rescuePostId], references: [id], onDelete: Cascade)
+  @@index([rescuePostId])
+  @@map("rescue_post_images")
+}
+
+// ========================================
+// COMMENT
+// ========================================
+
+model Comment {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @map("post_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  text String
+  createdAt DateTime @default(now()) @map("created_at")
+  post RescuePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([postId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+// ========================================
+// POST REPORT
+// ========================================
+
+model PostReport {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @map("post_id") @db.Uuid
+  reporterId String @map("reporter_id") @db.Uuid
+  reason String
+  description String?
+  status PostReportStatus @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at")
+  post RescuePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User @relation(fields: [reporterId], references: [id])
+  @@index([postId])
+  @@index([reporterId])
+  @@map("post_reports")
+}
+
+// ========================================
+// DONATION
+// ========================================
+
+model Donation {
+  id String @id @default(uuid()) @db.Uuid
+  donorId String @map("donor_id") @db.Uuid
+  rescuePostId String? @map("rescue_post_id") @db.Uuid
+  volunteerId String? @map("volunteer_id") @db.Uuid
+  paymentId String @unique @map("payment_id") @db.Uuid
+  amount Int
+  destinationType DonationDestinationType @map("destination_type")
+  createdAt DateTime @default(now()) @map("created_at")
+  donor User @relation(fields: [donorId], references: [id])
+  rescuePost RescuePost? @relation(fields: [rescuePostId], references: [id])
+  volunteer VolunteerProfile? @relation(fields: [volunteerId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+  financialTransaction FinancialTransaction?
+  @@index([donorId])
+  @@index([rescuePostId])
+  @@index([volunteerId])
+  @@map("donations")
+}
+
+// ========================================
+// WALLET
+// ========================================
+
+model Wallet {
+  id String @id @default(uuid()) @db.Uuid
+  volunteerId String @unique @map("volunteer_id") @db.Uuid
+  balance BigInt @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+  @@map("wallets")
+}
+
+// ========================================
+// WALLET TRANSACTION
+// ========================================
+
+model WalletTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  walletId String @map("wallet_id") @db.Uuid
+  relatedTransactionId String @map("related_transaction_id") @db.Uuid
+  amount BigInt
+  type WalletTransactionType
+  reference String?
+  createdAt DateTime @default(now()) @map("created_at")
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  relatedTransaction FinancialTransaction @relation(fields: [relatedTransactionId], references: [id])
+  @@index([walletId])
+  @@index([relatedTransactionId])
+  @@map("wallet_transactions")
+}
+
+// ========================================
+// PRODUCT CATEGORY
+// ========================================
+
+model ProductCategory {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique
+  products Product[]
+  @@map("product_categories")
+}
+
+// ========================================
+// PRODUCT
+// ========================================
+
+model Product {
+  id String @id @default(uuid()) @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  name String
+  costPrice Int @map("cost_price")
+  sellingPrice Int @map("selling_price")
+  stockQty Int @default(0) @map("stock_qty")
+  active Boolean @default(true)
+  category ProductCategory @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+  @@index([categoryId])
+  @@map("products")
+}
+
+// ========================================
+// ORDER
+// ========================================
+
+model Order {
+  id String @id @default(uuid()) @db.Uuid
+  buyerId String @map("buyer_id") @db.Uuid
+  paymentId String @unique @map("payment_id") @db.Uuid
+  totalAmount Int @map("total_amount")
+  paymentMethod PaymentMethod @map("payment_method")
+  status OrderStatus @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at")
+  buyer User @relation(fields: [buyerId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+  items OrderItem[]
+  financialTransaction FinancialTransaction?
+
+  @@index([buyerId])
+  @@map("orders")
+}
+
+// ========================================
+// ORDER ITEM
+// ========================================
+
+model OrderItem {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  quantity Int
+  unitPrice Int @map("unit_price")
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ========================================
+// PAYMENT
+// ========================================
+
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+  amount Int
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
+  reference String?
+  createdAt DateTime @default(now()) @map("created_at")
+  donation Donation?
+  order Order?
+  financialTransactions FinancialTransaction[]
+  @@map("payments")
+}
+
+// ========================================
+// FINANCIAL TRANSACTION
+// ========================================
+
+model FinancialTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  type FinancialTransactionType
+  source String?
+  destination String?
+  amount Int
+  relatedUserId String? @map("related_user_id") @db.Uuid
+  relatedVolunteerId String? @map("related_volunteer_id") @db.Uuid
+  relatedPostId String? @map("related_post_id") @db.Uuid
+  relatedOrderId String? @unique @map("related_order_id") @db.Uuid
+  status FinancialTransactionStatus @default(PENDING)
+  reference String?
+  createdAt DateTime @default(now()) @map("created_at")
+  relatedUser User? @relation("RelatedUser", fields: [relatedUserId], references: [id])
+  relatedVolunteer VolunteerProfile? @relation("RelatedVolunteer", fields: [relatedVolunteerId], references: [id])
+  relatedPost RescuePost? @relation("RelatedPost", fields: [relatedPostId], references: [id])
+  relatedOrder Order? @relation(fields: [relatedOrderId], references: [id])
+  paymentId String? @map("payment_id") @db.Uuid
+  payment Payment? @relation(fields: [paymentId], references: [id])
+  donationId String? @unique @map("donation_id") @db.Uuid
+  donation Donation? @relation(fields: [donationId], references: [id])
+  rescueFundId String? @map("rescue_fund_id") @db.Uuid
+  rescueFund RescueFund? @relation(fields: [rescueFundId], references: [id])
+  walletTransactions WalletTransaction[]
+  @@index([relatedUserId])
+  @@index([relatedVolunteerId])
+  @@index([relatedPostId])
+  @@index([paymentId])
+  @@index([rescueFundId])
+  @@map("financial_transactions")
+}
+
+
+// ========================================
+// RESCUE FUND
+// ========================================
+
+model RescueFund {
+  id String @id @default(uuid()) @db.Uuid
+  totalAvailable BigInt @default(0) @map("total_available")
+  totalUsed BigInt @default(0) @map("total_used")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  transactions FinancialTransaction[]
+  expenses RescueExpense[]
+  @@map("rescue_funds")
+}
+
+// ========================================
+// RESCUE EXPENSE
+// ========================================
+
+model RescueExpense {
+  id String @id @default(uuid()) @db.Uuid
+  volunteerId String @map("volunteer_id") @db.Uuid
+  rescuePostId String @map("rescue_post_id") @db.Uuid
+  rescueFundId String @map("rescue_fund_id") @db.Uuid
+  amount Int
+  description String
+  createdAt DateTime @default(now()) @map("created_at")
+  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id])
+  rescuePost RescuePost @relation(fields: [rescuePostId], references: [id])
+  rescueFund RescueFund @relation(fields: [rescueFundId], references: [id])
+  @@index([volunteerId])
+  @@index([rescuePostId])
+  @@index([rescueFundId])
+  @@map("rescue_expenses")
+}
