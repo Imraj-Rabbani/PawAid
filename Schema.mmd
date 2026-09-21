@@ -1,0 +1,211 @@
+erDiagram
+    USER ||--o| VOLUNTEER_PROFILE : "becomes"
+    USER ||--o{ RESCUE_POST : creates
+    USER ||--o{ COMMENT : writes
+    USER ||--o{ POST_REPORT : files
+    USER ||--o{ DONATION : makes
+    USER ||--o{ ORDER : places
+
+
+    RESCUE_AREA ||--o{ VOLUNTEER_PROFILE : "based in"
+    RESCUE_AREA ||--o{ RESCUE_POST : "located in"
+
+    VOLUNTEER_PROFILE ||--|| WALLET : has
+    VOLUNTEER_PROFILE ||--o{ RESCUE_POST : "assigned to"
+    VOLUNTEER_PROFILE ||--o{ DONATION : receives
+    VOLUNTEER_PROFILE ||--o{ RESCUE_EXPENSE : incurs
+
+    RESCUE_POST ||--o{ RESCUE_POST_IMAGE : has
+    RESCUE_POST ||--o{ COMMENT : has
+    RESCUE_POST ||--o{ POST_REPORT : "reported via"
+    RESCUE_POST ||--o{ DONATION : receives
+    RESCUE_POST ||--o{ RESCUE_EXPENSE : "funds used for"
+
+    DONATION ||--|| PAYMENT : "paid via"
+    DONATION ||--o| FINANCIAL_TRANSACTION : records
+
+    WALLET ||--o{ WALLET_TRANSACTION : logs
+
+    WALLET_TRANSACTION }o--|| FINANCIAL_TRANSACTION : "ledger entry for"
+
+    PRODUCT_CATEGORY ||--o{ PRODUCT : contains
+    PRODUCT ||--o{ ORDER_ITEM : "ordered as"
+
+    ORDER ||--o{ ORDER_ITEM : contains
+    ORDER ||--|| PAYMENT : "paid via"
+    ORDER ||--o| FINANCIAL_TRANSACTION : records
+
+    PAYMENT ||--o{ FINANCIAL_TRANSACTION : generates
+
+    RESCUE_FUND ||--o{ FINANCIAL_TRANSACTION : "tracked by"
+    RESCUE_FUND ||--o{ RESCUE_EXPENSE : allocates
+
+
+    USER {
+        uuid id PK
+        string name
+        string email UK
+        string password
+        string role
+        string status
+        datetime created_at
+    }
+
+    VOLUNTEER_PROFILE {
+        uuid id PK
+        uuid user_id FK
+        uuid rescue_area_id FK
+        string phone
+        string address
+        string profile_picture_url
+        string nid
+        string description
+        string status
+        datetime created_at
+    }
+
+    RESCUE_AREA {
+        uuid id PK
+        string name
+    }
+
+    RESCUE_POST {
+        uuid id PK
+        uuid creator_id FK
+        uuid rescue_area_id FK
+        uuid assigned_volunteer_id FK
+        string title
+        text description
+        int donation_target
+        int donation_received
+        string status
+        datetime created_at
+    }
+
+    RESCUE_POST_IMAGE {
+        uuid id PK
+        uuid rescue_post_id FK
+        string image_url
+    }
+
+    COMMENT {
+        uuid id PK
+        uuid post_id FK
+        uuid author_id FK
+        text text
+        datetime created_at
+    }
+
+    POST_REPORT {
+        uuid id PK
+        uuid post_id FK
+        uuid reporter_id FK
+        string reason
+        text description
+        string status
+        datetime created_at
+    }
+
+    DONATION {
+        uuid id PK
+        uuid donor_id FK
+        uuid rescue_post_id FK
+        uuid volunteer_id FK
+        uuid payment_id FK
+        int amount
+        string destination_type
+        datetime created_at
+    }
+
+    WALLET {
+        uuid id PK
+        uuid volunteer_id FK
+        bigint balance
+        datetime updated_at
+    }
+
+    WALLET_TRANSACTION {
+        uuid id PK
+        uuid wallet_id FK
+        uuid related_transaction_id FK
+        bigint amount
+        string type
+        string reference
+        datetime created_at
+    }
+
+    PRODUCT_CATEGORY {
+        uuid id PK
+        string name
+    }
+
+    PRODUCT {
+        uuid id PK
+        uuid category_id FK
+        string name
+        int cost_price
+        int selling_price
+        int stock_qty
+        boolean active
+    }
+
+    ORDER {
+        uuid id PK
+        uuid buyer_id FK
+        uuid payment_id FK
+        int total_amount
+        string payment_method
+        string status
+        datetime created_at
+    }
+
+    ORDER_ITEM {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        int quantity
+        int unit_price
+    }
+
+    PAYMENT {
+        uuid id PK
+        int amount
+        string method
+        string status
+        string reference
+        datetime created_at
+    }
+
+    FINANCIAL_TRANSACTION {
+        uuid id PK
+        string type
+        string source
+        string destination
+        int amount
+        uuid related_user_id FK
+        uuid related_volunteer_id FK
+        uuid related_post_id FK
+        uuid related_order_id FK
+        string status
+        string reference
+        datetime created_at
+    }
+
+    RESCUE_FUND {
+        uuid id PK
+        bigint total_available
+        bigint total_used
+        datetime updated_at
+    }
+
+    RESCUE_EXPENSE {
+        uuid id PK
+        uuid volunteer_id FK
+        uuid rescue_post_id FK
+        uuid rescue_fund_id FK
+        int amount
+        text description
+        datetime created_at
+    }
+
+   
