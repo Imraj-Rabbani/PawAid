@@ -19,15 +19,15 @@ const loginSchema = z.object({
 
 
 
-export async function register(req, res){
+export async function register(req, res) {
     const parsed = registerSchema.safeParse(req.body)
 
     if (!parsed.success) {
         return res.status(400).json({
-          message: "Validation failed",
-          errors: parsed.error.flatten().fieldErrors,
+            message: "Validation failed",
+            errors: parsed.error.flatten().fieldErrors,
         });
-      }
+    }
 
     const user = await createUser(parsed.data)
 
@@ -43,29 +43,29 @@ export async function register(req, res){
     })
 }
 
-export async function login(req, res){
+export async function login(req, res) {
     const parsed = loginSchema.safeParse(req.body)
 
     if (!parsed.success) {
         return res.status(400).json({
-          message: "Validation failed",
-          errors: parsed.error.flatten().fieldErrors,
+            message: "Validation failed",
+            errors: parsed.error.flatten().fieldErrors,
         });
-      }
-
-    const user = await findUser(parsed.data.email)
-    if(!user){
-        return res.status(400).json({
-            message: "No user with this email",
-          });
     }
 
-    const matchedPassword = await bcrypt.compare( parsed.data.password, user.password)
+    const user = await findUser(parsed.data.email)
+    if (!user) {
+        return res.status(400).json({
+            message: "No user with this email",
+        });
+    }
 
-    if(!matchedPassword){
+    const matchedPassword = await bcrypt.compare(parsed.data.password, user.password)
+
+    if (!matchedPassword) {
         return res.status(400).json({
             message: "Credentials do not match",
-          });
+        });
     }
 
     const token = generateToken({

@@ -2,18 +2,25 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../../db";
 
 
-export async function findUser(email){
+export async function findUser(email) {
     const user = await prisma.user.findUnique({
-        where: {email: email.toLowerCase()} 
+        where: { email: email.toLowerCase() }
     })
 
     return user;
 }
 
-export async function createUser({name, email, password}){
+export async function findById(userId) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId }
+    })
+    return user
+}
+
+export async function createUser({ name, email, password }) {
     const existingUser = await findUser(email)
-    
-    if(existingUser){
+
+    if (existingUser) {
         const error = new Error("User with this email already exists.");
         error.statusCode = 409;
         throw error;
