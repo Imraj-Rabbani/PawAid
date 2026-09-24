@@ -6,8 +6,8 @@ export async function requireAuth(req, res, next) {
     try {
         const authHeader = req.headers.authorization
 
-        if (!authHeader.startsWith("Bearer ")) {
-            return res.status(400).json({
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
                 message: "No header found"
             })
         }
@@ -15,7 +15,7 @@ export async function requireAuth(req, res, next) {
         const token = authHeader.split(" ")[1].trim()
 
         if (!token) {
-            return res.status(400).json({
+            return res.status(401).json({
                 message: "Token not found"
             })
         }
@@ -39,9 +39,8 @@ export async function requireAuth(req, res, next) {
 
         next()
     } catch (error) {
-        return res.status(401).json({
-            message: "Not Authorized"
-        })
+        console.error("Auth error:", error.message)
+        return res.status(401).json({ message: "Not Authorized" })
     }
 
 }
