@@ -70,7 +70,7 @@ export async function volunteerApplication(req, res) {
         await tx.wallet.create({
           data: {
             volunteerId: profile.id,
-            balance: 0n,
+            balance: 0,
           },
         });
   
