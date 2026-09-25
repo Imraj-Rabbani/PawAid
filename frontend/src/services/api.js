@@ -35,11 +35,11 @@ api.interceptors.response.use(
 
 export const authService = {
   signUp: async (userData) => {
-    const response = await api.post('/auth/signup', userData);
+    const response = await api.post('/signup', userData);
     return response.data;
   },
   signIn: async (credentials) => {
-    const response = await api.post('/auth/signin', credentials);
+    const response = await api.post('/signin', credentials);
     return response.data;
   },
 };

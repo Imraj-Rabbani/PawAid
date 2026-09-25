@@ -22,7 +22,7 @@ const SignIn = () => {
 
   const validateForm = () => {
     const result = loginSchema.safeParse(formData);
-  
+
     if (!result.success) {
       const newErrors = {};
       result.error.issues.forEach((issue) => {
@@ -31,7 +31,7 @@ const SignIn = () => {
       setErrors(newErrors);
       return false;
     }
-  
+
     setErrors({});
     return true;
   };
@@ -58,11 +58,8 @@ const SignIn = () => {
       if (response.token) {
         localStorage.setItem('token', response.token);
       }
-      if (rememberMe) {
-        localStorage.setItem('rememberMe', 'true');
-      }
 
-      navigate('/dashboard');
+      navigate('/');
     } catch (error) {
       const message =
         error.response?.data?.message ||
@@ -112,11 +109,10 @@ const SignIn = () => {
                 autoComplete="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                  errors.email
+                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.email
                     ? 'border-red-300 focus:ring-red-200'
                     : 'border-gray-300 focus:ring-indigo-200 focus:border-indigo-500'
-                }`}
+                  }`}
                 placeholder="you@example.com"
               />
               {errors.email && (
@@ -140,11 +136,10 @@ const SignIn = () => {
                   autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
-                    errors.password
+                  className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${errors.password
                       ? 'border-red-300 focus:ring-red-200'
                       : 'border-gray-300 focus:ring-indigo-200 focus:border-indigo-500'
-                  }`}
+                    }`}
                   placeholder="••••••••"
                 />
                 <button
@@ -162,16 +157,7 @@ const SignIn = () => {
             </div>
 
             {/* Remember me & Forgot password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
+            <div className="flex items-center justify-end">
               <Link
                 to="/forgot-password"
                 className="text-sm font-medium text-indigo-600 hover:text-indigo-500"

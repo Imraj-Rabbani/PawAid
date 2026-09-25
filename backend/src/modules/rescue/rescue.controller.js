@@ -5,13 +5,13 @@ export async function addArea(req, res){
     try {
         const {area} = req.body
 
-    const area = await prisma.rescueArea.create({
+    const areaCreated = await prisma.rescueArea.create({
         name: area
     })
 
     return res.json({
         message: "Area created",
-        data: area
+        data: areaCreated
     })
     } catch (error) {
         console.error(error);
