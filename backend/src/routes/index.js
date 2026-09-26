@@ -5,6 +5,8 @@ import { getUserProfile, login, register } from "../modules/auth/auth.controller
 import { volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, listAreas } from "../modules/rescue/rescue.controller.js";
+import { updateProfilePicture } from "../modules/user/user.controller.js";
+import { upload } from "../middleware/upload.middleware.js";
 
 const app = express()
 const router = Router()
@@ -16,6 +18,7 @@ app.use(cors({
 router.post("/signup", register)
 router.post("/signin", login)
 router.get("/profile/:userId", requireAuth, getUserProfile)
+router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"), updateProfilePicture)
 
 router.get("/area", listAreas)
 router.post("/add-area", requireAuth, addArea)

@@ -18,7 +18,6 @@ const SignIn = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   const validateForm = () => {
     const result = loginSchema.safeParse(formData);
@@ -156,15 +155,6 @@ const SignIn = () => {
               )}
             </div>
 
-            {/* Remember me & Forgot password */}
-            <div className="flex items-center justify-end">
-              <Link
-                to="/forgot-password"
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Forgot password?
-              </Link>
-            </div>
 
             {/* Submit */}
             <button

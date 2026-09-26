@@ -1,4 +1,4 @@
-import env from "../../config/db";
+import env from "../../config/env";
 import jwt from "jsonwebtoken";
 
 export function sanitizeUser(user) {

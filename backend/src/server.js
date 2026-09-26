@@ -1,5 +1,5 @@
 import express from "express";
-import env from "./config/db.js";
+import env from "./config/env.js";
 import { prisma } from "./db.js";
 import cors from "cors"
 import routes from "./routes/index.js";
