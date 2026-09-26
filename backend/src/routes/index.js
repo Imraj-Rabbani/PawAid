@@ -1,11 +1,11 @@
 import express from "express";
 import { Router } from "express";
 import cors from "cors";
-import { getUserProfile, login, register } from "../modules/auth/auth.controller.js";
+import { login, register } from "../modules/auth/auth.controller.js";
 import { volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, listAreas } from "../modules/rescue/rescue.controller.js";
-import { updateProfilePicture } from "../modules/user/user.controller.js";
+import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 
 const app = express()
@@ -17,11 +17,16 @@ app.use(cors({
 
 router.post("/signup", register)
 router.post("/signin", login)
+
+
 router.get("/profile/:userId", requireAuth, getUserProfile)
+router.put("/profile/update", requireAuth, updateProfile)
 router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"), updateProfilePicture)
+
 
 router.get("/area", listAreas)
 router.post("/add-area", requireAuth, addArea)
+
 
 router.get("/volunteer", volunteers)
 router.post("/volunteer/apply", requireAuth, volunteerApplication)
