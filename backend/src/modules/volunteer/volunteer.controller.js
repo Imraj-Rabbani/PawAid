@@ -121,3 +121,29 @@ export async function volunteer(req, res) {
     res.status(500).json({ error: "Failed to fetch volunteer" });
   }
 }
+
+
+export async function updateVolunteerProfile(req, res){
+  try {
+    const userId = req.user.id;
+    const { location, nid, description } = req.body;
+
+    const existing = await prisma.volunteerProfile.findUnique({ where: { userId } });
+    if (!existing) return res.status(404).json({ error: "Volunteer profile not found" });
+
+    const profile = await prisma.volunteerProfile.update({
+      where: { userId },
+      data: {
+        ...(location && { location }),
+        ...(nid && { nid }),
+        ...(description !== undefined && { description }),
+      },
+    });
+
+    res.json(profile);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to Volunteer information" });
+  }
+
+}
