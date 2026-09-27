@@ -2,7 +2,7 @@ import express from "express";
 import { Router } from "express";
 import cors from "cors";
 import { login, register } from "../modules/auth/auth.controller.js";
-import { volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
+import { volunteer, volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, listAreas } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
@@ -30,5 +30,6 @@ router.post("/add-area", requireAuth, addArea)
 
 router.get("/volunteer", volunteers)
 router.post("/volunteer/apply", requireAuth, volunteerApplication)
+router.get("/volunteer/profile", requireAuth, volunteer)
 
 export default router
