@@ -3,7 +3,7 @@ import './App.css'
 import Homepage from "./pages/Homepage"
 import SignIn from "./pages/Signin"
 import SignUp from "./pages/Signup"
-import ProfilePage from "./pages/Profile"
+import ProfilePage from "./pages/ProfilePage"
 
 function App() {
 
