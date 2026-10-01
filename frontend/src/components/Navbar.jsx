@@ -28,7 +28,7 @@ export default function Navbar({ user: userProp }) {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    localStorage.removeItem("token"); 
+    localStorage.removeItem("token");
     navigate("/login");
   };
 
@@ -41,9 +41,11 @@ export default function Navbar({ user: userProp }) {
             onClick={() => navigate("/")}
             className="flex items-center gap-2 shrink-0"
           >
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
-              P
-            </div>
+            <img
+              src="/logo.png"
+              alt="PawAid logo"
+              className="w-15 h-15 rounded-lg object-contain"
+            />
             <span className="font-semibold text-gray-900 text-lg hidden sm:block">
               PawAid
             </span>
@@ -55,11 +57,10 @@ export default function Navbar({ user: userProp }) {
               <button
                 key={link.path}
                 onClick={() => navigate(link.path)}
-                className={`px-3 py-2 text-sm font-medium rounded-lg transition ${
-                  isActive(link.path)
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition ${isActive(link.path)
                     ? "text-blue-700 bg-blue-50"
                     : "text-gray-700 hover:text-blue-700 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 {link.label}
               </button>
@@ -154,11 +155,10 @@ export default function Navbar({ user: userProp }) {
                   navigate(link.path);
                   setMobileOpen(false);
                 }}
-                className={`text-left px-3 py-2 text-sm font-medium rounded-lg transition ${
-                  isActive(link.path)
+                className={`text-left px-3 py-2 text-sm font-medium rounded-lg transition ${isActive(link.path)
                     ? "text-blue-700 bg-blue-50"
                     : "text-gray-700 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 {link.label}
               </button>
