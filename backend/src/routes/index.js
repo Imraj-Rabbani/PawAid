@@ -7,6 +7,8 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, listAreas } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { requireAdmin } from "../middleware/admin.middleware.js";
+import { getStats } from "../modules/admin/admin.controller.js";
 
 const app = express()
 const router = Router()
@@ -25,7 +27,10 @@ router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"
 
 
 router.get("/area", listAreas)
-router.post("/add-area", requireAuth, addArea)
+router.post("/add-area", requireAuth, requireAdmin, addArea)
+
+
+router.get("/admin/stats", requireAuth, requireAdmin, getStats)
 
 
 router.get("/volunteer", volunteers)

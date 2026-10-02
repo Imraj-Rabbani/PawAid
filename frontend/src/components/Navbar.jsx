@@ -16,20 +16,21 @@ export default function Navbar({ user: userProp }) {
     { label: "Volunteers", path: "/volunteers" },
     { label: "Donations", path: "/donations" },
     { label: "About", path: "/about" },
+    ...(user?.role === "ADMIN" ? [{ label: "Admin", path: "/admin" }] : []),
   ];
 
   const isActive = (path) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   const goToProfile = () => {
-    if (!user) return navigate("/login");
+    if (!user) return navigate("/signin");
     navigate(`/profile/${user.id}`);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    navigate("/login");
+    navigate("/signin");
   };
 
   return (
