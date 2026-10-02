@@ -1,6 +1,4 @@
-import express from "express";
 import { Router } from "express";
-import cors from "cors";
 import { login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
@@ -10,12 +8,7 @@ import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { getStats } from "../modules/admin/admin.controller.js";
 
-const app = express()
 const router = Router()
-
-app.use(cors({
-    origin: "http://localhost:5173"
-}));
 
 router.post("/signup", register)
 router.post("/signin", login)

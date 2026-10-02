@@ -1,4 +1,4 @@
-import { prisma } from "../../db"
+import { prisma } from "../../db.js"
 
 
 export async function getStats(req, res) {
@@ -14,6 +14,6 @@ export async function getStats(req, res) {
         })
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to fetch stats" });
+        res.status(500).json({ message: "Failed to fetch stats" });
     }
 }

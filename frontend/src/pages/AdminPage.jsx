@@ -30,7 +30,6 @@ export default function AdminPage() {
         console.error(err);
         setError(
           err.response?.data?.message ||
-            err.response?.data?.error ||
             "Failed to load the admin panel"
         );
       } finally {
@@ -56,8 +55,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error(err);
       setAreaError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
+        err.response?.data?.message ||
           "Failed to add area"
       );
     } finally {

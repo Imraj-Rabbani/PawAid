@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import api from "../services/api";
+import { useParams, Navigate } from "react-router-dom";
+import api, { updateStoredUser } from "../services/api";
 import Sidebar from "../components/profile/Sidebar";
 import ProfileTab from "../components/profile/ProfileTab";
 import DonationsTab from "../components/profile/DonationsTab";
@@ -12,6 +12,8 @@ const TABS = ["Profile", "Donations", "Rescues", "Address", "Orders"];
 
 export default function ProfilePage() {
   const { userId } = useParams();
+  const currentUser = JSON.parse(localStorage.getItem("user") || "null");
+  const isOwnProfile = currentUser?.id === userId;
   const [user, setUser] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -49,14 +51,17 @@ export default function ProfilePage() {
       });
       setUser((prev) => ({ ...prev, ...res.data }));
       setPreview(res.data.profilePictureUrl);
+      updateStoredUser({ profilePictureUrl: res.data.profilePictureUrl });
     } catch (err) {
       console.error(err);
-      alert("Upload failed");
+      alert(err.response?.data?.message || "Upload failed");
       setPreview(user?.profilePictureUrl);
     } finally {
       setUploading(false);
     }
   };
+
+  if (!currentUser) return <Navigate to="/signin" replace />;
 
   if (loading) {
     return (
@@ -87,9 +92,10 @@ export default function ProfilePage() {
                 preview={preview}
                 uploading={uploading}
                 onFileChange={handleFileChange}
-                tabs={TABS}
+                tabs={isOwnProfile ? TABS : ["Profile"]}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
+                isOwnProfile={isOwnProfile}
               />
             </aside>
 
@@ -97,7 +103,7 @@ export default function ProfilePage() {
             <main className="md:w-[70%] w-full">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 min-h-125">
                 {activeTab === "Profile" && (
-                  <ProfileTab user={user} setUser={setUser} isOwnProfile />
+                  <ProfileTab key={user.id} user={user} setUser={setUser} isOwnProfile={isOwnProfile} />
                 )}
                 {activeTab === "Donations" && <DonationsTab />}
                 {activeTab === "Rescues" && <EmptyTab title="Rescues" />}

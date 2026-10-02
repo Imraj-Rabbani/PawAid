@@ -1,8 +1,7 @@
 import z from "zod";
-import { prisma } from "../../db";
 import bcrypt from "bcryptjs";
 import { generateToken, sanitizeUser } from "./auth.utils.js"
-import { createUser, findUser } from "./auth.services";
+import { createUser, findUser } from "./auth.services.js";
 
 
 
@@ -14,7 +13,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
     email: z.email("Please provide a valid email address."),
-    password: z.string().min(8, "Password must be at least 8 characters long."),
+    password: z.string().min(1, "Password is required."),
 });
 
 

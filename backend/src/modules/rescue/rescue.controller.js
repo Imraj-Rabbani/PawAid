@@ -1,4 +1,4 @@
-import { prisma } from "../../db"
+import { prisma } from "../../db.js"
 
 
 export async function addArea(req, res){
@@ -6,7 +6,7 @@ export async function addArea(req, res){
         const name = typeof req.body?.area === "string" ? req.body.area.trim() : ""
 
         if (!name) {
-            return res.status(400).json({ error: "Area name is required" })
+            return res.status(400).json({ message: "Area name is required" })
         }
 
         const areaCreated = await prisma.rescueArea.create({
@@ -19,10 +19,10 @@ export async function addArea(req, res){
         })
     } catch (error) {
         if (error.code === "P2002") {
-            return res.status(409).json({ error: "Area already exists" })
+            return res.status(409).json({ message: "Area already exists" })
         }
         console.error(error);
-        res.status(500).json({ error: "Failed to Create area" });
+        res.status(500).json({ message: "Failed to Create area" });
     }
 }
 
@@ -36,6 +36,6 @@ export async function listAreas(req, res){
         })
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to fetch area" });
+        res.status(500).json({ message: "Failed to fetch area" });
     }
 }

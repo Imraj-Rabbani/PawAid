@@ -1,4 +1,4 @@
-import { prisma } from "../../db";
+import { prisma } from "../../db.js";
 
 const volunteerInclude = {
   user: {
@@ -18,42 +18,65 @@ const volunteerInclude = {
 };
 
 
+// Public listing: never expose nid, contact details or wallet here
+const publicVolunteerSelect = {
+  id: true,
+  description: true,
+  status: true,
+  createdAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      profilePictureUrl: true,
+    },
+  },
+  rescueArea: true,
+};
+
+
 export async function volunteers(req, res) {
   try {
-    const activeVolunteers = await prisma.volunteerProfile.findMany({
+    const allVolunteers = await prisma.volunteerProfile.findMany({
       where: {
-        status: VolunteerStatus.ACTIVE
-      }, include: volunteerInclude,
+        status: { notIn: ["INACTIVE", "SUSPENDED"] }
+      }, select: publicVolunteerSelect,
       orderBy: { createdAt: "desc" }
     })
 
     return res.json({
       message: "Successfully sent the volunteers",
-      data: activeVolunteers
+      data: allVolunteers
     })
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to fetch volunteers" });
+    res.status(500).json({ message: "Failed to fetch volunteers" });
   }
 }
 
 
 export async function volunteerApplication(req, res) {
   try {
-    const { userId, rescueAreaId, phone, address, profilePictureUrl, nid, description } = req.body
+    const userId = req.user.id
+    const { rescueAreaId, phone, address, profilePictureUrl, description } = req.body
+    const nid = typeof req.body.nid === "string" ? req.body.nid.trim() : ""
 
     if (!rescueAreaId || !nid) {
       return res.status(400).json({ message: "rescueAreaId and nid are required" })
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found." })
+    if (req.user.role === "VOLUNTEER") {
+      return res.status(409).json({ message: `${req.user.name} is already a volunteer` })
     }
 
-    if (user.role === "VOLUNTEER") {
-      return res.status(409).json({ message: `${user.name} is already a volunteer` })
+    if (req.user.role !== "USER") {
+      return res.status(403).json({ message: "Only normal users can apply to be a volunteer" })
+    }
+
+    // a malformed id makes the lookup throw, treat it the same as a missing area
+    const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } }).catch(() => null)
+    if (!area) {
+      return res.status(400).json({ message: "Invalid rescue area" })
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -63,7 +86,7 @@ export async function volunteerApplication(req, res) {
           rescueAreaId,
           nid,
           description: description || null,
-          status: "PENDING",
+          status: "ACTIVE",
         },
       });
 
@@ -95,6 +118,9 @@ export async function volunteerApplication(req, res) {
     if (error.code === "P2002") {
       return res.status(409).json({ message: "NID already registered" })
     }
+    if (error.code === "P2003") {
+      return res.status(400).json({ message: "Invalid rescue area" })
+    }
     console.error(error)
     return res.status(500).json({ message: "Failed to submit volunteer application" })
   }
@@ -112,13 +138,13 @@ export async function volunteer(req, res) {
     })
 
     if (!volunteer) {
-      return res.status(404).json({ error: "Volunteer profile not found" });
+      return res.status(404).json({ message: "Volunteer profile not found" });
     }
 
     return res.json(volunteer)
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to fetch volunteer" });
+    res.status(500).json({ message: "Failed to fetch volunteer" });
   }
 }
 
@@ -126,24 +152,36 @@ export async function volunteer(req, res) {
 export async function updateVolunteerProfile(req, res){
   try {
     const userId = req.user.id;
-    const { location, nid, description } = req.body;
+    const { rescueAreaId, nid, description } = req.body;
 
     const existing = await prisma.volunteerProfile.findUnique({ where: { userId } });
-    if (!existing) return res.status(404).json({ error: "Volunteer profile not found" });
+    if (!existing) return res.status(404).json({ message: "Volunteer profile not found" });
+
+    if (rescueAreaId) {
+      const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } }).catch(() => null);
+      if (!area) return res.status(400).json({ message: "Invalid rescue area" });
+    }
 
     const profile = await prisma.volunteerProfile.update({
       where: { userId },
       data: {
-        ...(location && { location }),
+        ...(rescueAreaId && { rescueAreaId }),
         ...(nid && { nid }),
         ...(description !== undefined && { description }),
       },
+      include: { rescueArea: true },
     });
 
     res.json(profile);
   } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(409).json({ message: "NID already registered" });
+    }
+    if (error.code === "P2003") {
+      return res.status(400).json({ message: "Invalid rescue area" });
+    }
     console.error(error);
-    res.status(500).json({ error: "Failed to Volunteer information" });
+    res.status(500).json({ message: "Failed to update volunteer information" });
   }
 
 }

@@ -24,11 +24,18 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      // Optionally redirect to signin
+      localStorage.removeItem('user');
     }
     return Promise.reject(error);
   }
 );
+
+// Keep the user saved at sign in up to date after profile changes
+export const updateStoredUser = (fields) => {
+  const stored = JSON.parse(localStorage.getItem('user') || 'null');
+  if (!stored) return;
+  localStorage.setItem('user', JSON.stringify({ ...stored, ...fields }));
+};
 
 export const authService = {
   signUp: async (userData) => {

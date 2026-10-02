@@ -98,13 +98,13 @@ export default function Navbar({ user: userProp }) {
             ) : (
               <>
                 <button
-                  onClick={() => navigate("/login")}
+                  onClick={() => navigate("/signin")}
                   className="text-sm font-medium text-gray-700 hover:text-blue-700"
                 >
                   Login
                 </button>
                 <button
-                  onClick={() => navigate("/register")}
+                  onClick={() => navigate("/signup")}
                   className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition"
                 >
                   Sign Up

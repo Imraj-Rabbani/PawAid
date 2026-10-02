@@ -1,5 +1,5 @@
 import { useState } from "react";
-import api from "../../services/api";
+import api, { updateStoredUser } from "../../services/api";
 import VolunteerForm from "./VolunteerForm";
 
 export default function ProfileTab({ user, setUser, isOwnProfile }) {
@@ -15,12 +15,13 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const res = await api.put("/volunteer/profile", form);
+      const res = await api.put("/profile/update", form);
       setUser((prev) => ({ ...prev, ...res.data }));
+      updateStoredUser({ name: res.data.name, phone: res.data.phone });
       setEditing(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to update profile");
+      alert(err.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -46,31 +47,35 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="input"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           ) : (
-            <p className="value">{user.name}</p>
+            <p className="text-gray-900">{user.name}</p>
           )}
         </Field>
 
-        <Field label="Email">
-          <p className="value">{user.email}</p>
-        </Field>
+        {user.email && (
+          <Field label="Email">
+            <p className="text-gray-900">{user.email}</p>
+          </Field>
+        )}
 
-        <Field label="Phone">
-          {editing ? (
-            <input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="input"
-            />
-          ) : (
-            <p className="value">{user.phone || "—"}</p>
-          )}
-        </Field>
+        {(isOwnProfile || user.phone) && (
+          <Field label="Phone">
+            {editing ? (
+              <input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <p className="text-gray-900">{user.phone || "—"}</p>
+            )}
+          </Field>
+        )}
 
         <Field label="Role">
-          <p className="value capitalize">{user.role}</p>
+          <p className="text-gray-900 capitalize">{user.role?.toLowerCase()}</p>
         </Field>
       </div>
 
@@ -111,9 +116,12 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
             </button>
           ) : (
             <VolunteerForm
+              user={user}
               onCancel={() => setShowVolunteerForm(false)}
-              onSuccess={(updatedUser) => {
-                setUser((prev) => ({ ...prev, ...updatedUser }));
+              onSuccess={(profile) => {
+                const { user: updatedUser, ...volunteerProfile } = profile;
+                setUser((prev) => ({ ...prev, ...updatedUser, volunteerProfile }));
+                updateStoredUser(updatedUser);
                 setShowVolunteerForm(false);
               }}
             />
@@ -121,7 +129,7 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
         </div>
       )}
 
-      {user.role === "volunteer" && user.volunteerProfile && (
+      {user.role === "VOLUNTEER" && user.volunteerProfile && (
         <div className="mt-10 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Volunteer Information</h3>
@@ -139,7 +147,10 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
             editing={editingVolunteer}
             onCancel={() => setEditingVolunteer(false)}
             onSuccess={(updated) => {
-              setUser((prev) => ({ ...prev, volunteerProfile: updated }));
+              setUser((prev) => ({
+                ...prev,
+                volunteerProfile: { ...prev.volunteerProfile, ...updated },
+              }));
               setEditingVolunteer(false);
             }}
           />

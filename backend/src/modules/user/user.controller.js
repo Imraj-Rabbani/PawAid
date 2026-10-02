@@ -1,12 +1,12 @@
-import { prisma } from "../../db";
-import { uploadToR2 } from "../../services/upload.services";
-import { sanitizeUser } from "../auth/auth.utils";
+import { prisma } from "../../db.js";
+import { uploadToR2 } from "../../services/upload.services.js";
+import { sanitizeUser } from "../auth/auth.utils.js";
 
 
 
 export async function updateProfilePicture(req, res) {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const userId = req.user.id;
     const key = `profile-pictures/${userId}-${Date.now()}.${req.file.mimetype.split("/")[1]}`;
@@ -22,7 +22,7 @@ export async function updateProfilePicture(req, res) {
     res.json(user);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to update user profile" });
+    res.status(500).json({ message: "Failed to update user profile" });
   }
 }
 
@@ -30,27 +30,42 @@ export async function getUserProfile(req, res){
   try {
       const {userId} = req.params
 
+      // a malformed id makes the lookup throw, treat it the same as a missing user
       const user = await prisma.user.findUnique({
           where: {id : userId},
-      })
+          include: { volunteerProfile: { include: { rescueArea: true } } },
+      }).catch(() => null)
 
       if (!user) {
-          return res.status(404).json({ error: "User not found" });
+          return res.status(404).json({ message: "User not found" });
+      }
+
+      // Contact details and NID are only visible to their owner and admins
+      if (req.user.id !== user.id && req.user.role !== "ADMIN") {
+          delete user.email
+          delete user.phone
+          delete user.address
+          if (user.volunteerProfile) delete user.volunteerProfile.nid
       }
 
       res.status(200).json(sanitizeUser(user));
   } catch (error) {
       console.error(error);
-      res.status(500).json({ error: "Failed to fetch user profile" });
+      res.status(500).json({ message: "Failed to fetch user profile" });
       
   }
 }
 
 export async function updateProfile(req, res){
   try {
-    const {userId} = req.user.id
+    const userId = req.user.id
 
-    const {name, phone} = req.body
+    const {phone} = req.body
+    const name = typeof req.body.name === "string" ? req.body.name.trim() : undefined
+
+    if (name !== undefined && name.length < 3) {
+      return res.status(400).json({ message: "Name must be at least 3 characters long." })
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
@@ -65,7 +80,7 @@ export async function updateProfile(req, res){
         phone: true,
         role: true,
         profilePictureUrl: true,
-        volunteerProfile: true,
+        volunteerProfile: { include: { rescueArea: true } },
       },
     })
 
@@ -73,6 +88,6 @@ export async function updateProfile(req, res){
 
   } catch (error) {
     console.error(error);
-      res.status(500).json({ error: "Failed to update user profile" });
+      res.status(500).json({ message: "Failed to update user profile" });
   }
 }

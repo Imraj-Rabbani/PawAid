@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "../../db";
+import { prisma } from "../../db.js";
 
 
 export async function findUser(email) {
