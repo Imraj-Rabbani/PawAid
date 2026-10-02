@@ -2,7 +2,7 @@ import { Router } from "express";
 import { login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { addArea, listAreas } from "../modules/rescue/rescue.controller.js";
+import { addArea, createPost, listAreas, listPosts } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
@@ -21,6 +21,10 @@ router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"
 
 router.get("/area", listAreas)
 router.post("/add-area", requireAuth, requireAdmin, addArea)
+
+
+router.get("/rescue-post", listPosts)
+router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
 
 
 router.get("/admin/stats", requireAuth, requireAdmin, getStats)

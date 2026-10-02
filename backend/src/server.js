@@ -17,8 +17,11 @@ app.use((err, req, res, next) => {
 
   if (status >= 500) console.error(err)
 
+  // multer reports more files than a route allows as an "unexpected field"
+  const message = err.code === "LIMIT_UNEXPECTED_FILE" ? "Too many files uploaded" : err.message
+
   res.status(status).json({
-    message: status >= 500 ? "Something went wrong" : err.message
+    message: status >= 500 ? "Something went wrong" : message
   })
 })
 
