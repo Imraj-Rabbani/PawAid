@@ -7,6 +7,7 @@ import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { getStats } from "../modules/admin/admin.controller.js";
+import { topUpWallet } from "../modules/wallet/wallet.controller.js";
 
 const router = Router()
 
@@ -34,5 +35,8 @@ router.get("/volunteer", volunteers)
 router.post("/volunteer/apply", requireAuth, volunteerApplication)
 router.get("/volunteer/profile", requireAuth, volunteer)
 router.put("/volunteer/profile", requireAuth, updateVolunteerProfile)
+
+
+router.post("/wallet/top-up", requireAuth, topUpWallet)
 
 export default router

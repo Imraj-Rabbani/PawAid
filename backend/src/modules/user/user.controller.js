@@ -33,7 +33,7 @@ export async function getUserProfile(req, res){
       // a malformed id makes the lookup throw, treat it the same as a missing user
       const user = await prisma.user.findUnique({
           where: {id : userId},
-          include: { volunteerProfile: { include: { rescueArea: true } } },
+          include: { volunteerProfile: { include: { rescueArea: true, wallet: true } } },
       }).catch(() => null)
 
       if (!user) {
@@ -80,7 +80,7 @@ export async function updateProfile(req, res){
         phone: true,
         role: true,
         profilePictureUrl: true,
-        volunteerProfile: { include: { rescueArea: true } },
+        volunteerProfile: { include: { rescueArea: true, wallet: true } },
       },
     })
 

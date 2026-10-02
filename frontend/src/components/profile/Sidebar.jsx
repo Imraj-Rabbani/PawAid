@@ -1,3 +1,5 @@
+import WalletCard from "./WalletCard";
+
 export default function Sidebar({
     user,
     preview,
@@ -7,6 +9,7 @@ export default function Sidebar({
     activeTab,
     onTabChange,
     isOwnProfile,
+    onWalletUpdated,
   }) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -52,7 +55,15 @@ export default function Sidebar({
             {user.role?.toLowerCase()}
           </span>
         </div>
-  
+
+        {user.volunteerProfile?.wallet && (
+          <WalletCard
+            wallet={user.volunteerProfile.wallet}
+            canTopUp={isOwnProfile}
+            onToppedUp={onWalletUpdated}
+          />
+        )}
+
         {/* Tabs */}
         <nav className="mt-6 flex flex-col gap-1">
           {tabs.map((tab) => (
