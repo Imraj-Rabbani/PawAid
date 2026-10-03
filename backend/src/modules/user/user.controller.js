@@ -33,18 +33,19 @@ export async function getUserProfile(req, res){
       // a malformed id makes the lookup throw, treat it the same as a missing user
       const user = await prisma.user.findUnique({
           where: {id : userId},
-          include: { volunteerProfile: { include: { rescueArea: true, wallet: true } } },
+          include: { wallet: true, volunteerProfile: { include: { rescueArea: true } } },
       }).catch(() => null)
 
       if (!user) {
           return res.status(404).json({ message: "User not found" });
       }
 
-      // Contact details and NID are only visible to their owner and admins
+      // Contact details, wallet and NID are only visible to their owner and admins
       if (req.user.id !== user.id && req.user.role !== "ADMIN") {
           delete user.email
           delete user.phone
           delete user.address
+          delete user.wallet
           if (user.volunteerProfile) delete user.volunteerProfile.nid
       }
 
@@ -80,7 +81,8 @@ export async function updateProfile(req, res){
         phone: true,
         role: true,
         profilePictureUrl: true,
-        volunteerProfile: { include: { rescueArea: true, wallet: true } },
+        wallet: true,
+        volunteerProfile: { include: { rescueArea: true } },
       },
     })
 

@@ -1,5 +1,6 @@
 import z from "zod";
 import { prisma } from "../../db.js";
+import { creditWallet } from "../../services/wallet.services.js";
 
 const topUpSchema = z.object({
   amount: z
@@ -24,15 +25,15 @@ export async function topUpWallet(req, res) {
     const { amount } = parsed.data
     const userId = req.user.id
 
-    const volunteer = req.volunteer
+    const wallet = await prisma.wallet.findUnique({ where: { userId } })
 
-    if (!volunteer.wallet) {
-      return res.status(403).json({ message: "Only volunteers have a wallet" })
+    if (!wallet) {
+      return res.status(404).json({ message: "Wallet not found" })
     }
 
     // Dummy top up: no money is collected, the payment is recorded as completed
     // straight away. Replace the payment step with the gateway flow later.
-    const wallet = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
           amount,
@@ -49,35 +50,45 @@ export async function topUpWallet(req, res) {
           destination: "WALLET",
           amount,
           relatedUserId: userId,
-          relatedVolunteerId: volunteer.id,
           paymentId: payment.id,
           status: "COMPLETED",
           reference: "Wallet top up",
         },
       });
 
-      await tx.walletTransaction.create({
-        data: {
-          walletId: volunteer.wallet.id,
-          relatedTransactionId: transaction.id,
-          amount,
-          type: "CREDIT",
-          reference: "Wallet top up",
-        },
-      });
-
-      return tx.wallet.update({
-        where: { id: volunteer.wallet.id },
-        data: { balance: { increment: amount } },
+      return creditWallet(tx, {
+        walletId: wallet.id,
+        amount,
+        transactionId: transaction.id,
+        reference: "Wallet top up",
       });
     });
 
     return res.json({
       message: "Wallet topped up",
-      data: wallet
+      data: updated
     })
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to top up wallet" });
+  }
+}
+
+
+export async function myWallet(req, res) {
+  try {
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true, balance: true, updatedAt: true },
+    })
+
+    if (!wallet) {
+      return res.status(404).json({ message: "Wallet not found" })
+    }
+
+    return res.json({ message: "Wallet sent", data: wallet })
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch wallet" });
   }
 }

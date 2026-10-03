@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
+import DonateCard from "../components/volunteer/DonateCard";
 
 const STATUS_STYLES = {
   OPEN: "bg-blue-100 text-blue-700",
@@ -50,6 +51,16 @@ export default function VolunteerProfilePage() {
     fetchVolunteer();
   }, [volunteerId]);
 
+  // after a donation, quietly reload so the balance and history update
+  const refreshVolunteer = async () => {
+    try {
+      const res = await api.get(`/volunteer/${volunteerId}`);
+      setVolunteer(res.data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -66,14 +77,14 @@ export default function VolunteerProfilePage() {
             <p className="text-sm text-red-600">{error}</p>
           </div>
         ) : (
-          <VolunteerProfile volunteer={volunteer} />
+          <VolunteerProfile volunteer={volunteer} onDonated={refreshVolunteer} />
         )}
       </main>
     </div>
   );
 }
 
-function VolunteerProfile({ volunteer }) {
+function VolunteerProfile({ volunteer, onDonated }) {
   const { user, rescueArea, description, createdAt, assignedPosts, stats, wallet } = volunteer;
 
   return (
@@ -106,11 +117,16 @@ function VolunteerProfile({ volunteer }) {
               {formatMoney(wallet.balance)}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-              <Stat label="Received" value={formatMoney(wallet.totalReceived)} />
+              <Stat label="Donations" value={formatMoney(stats.donationsReceived)} />
               <Stat label="Spent" value={formatMoney(wallet.totalSpent)} />
             </div>
+            <p className="mt-3 text-xs text-center text-gray-400">
+              {stats.donationCount} {stats.donationCount === 1 ? "donation" : "donations"} received
+            </p>
           </div>
         )}
+
+        {wallet && <DonateCard volunteer={volunteer} onDonated={onDonated} />}
       </aside>
 
       {/* RIGHT: details */}

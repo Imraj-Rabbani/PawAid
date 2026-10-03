@@ -56,10 +56,10 @@ export default function Sidebar({
           </span>
         </div>
 
-        {user.volunteerProfile?.wallet && (
+        {user.wallet && (
           <WalletCard
-            wallet={user.volunteerProfile.wallet}
-            canTopUp={isOwnProfile && user.volunteerProfile.status === "ACTIVE"}
+            wallet={user.wallet}
+            canTopUp={isOwnProfile}
             onToppedUp={onWalletUpdated}
           />
         )}

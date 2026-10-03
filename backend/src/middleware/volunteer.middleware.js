@@ -7,7 +7,6 @@ export async function requireActiveVolunteer(req, res, next) {
     try {
         const volunteer = await prisma.volunteerProfile.findUnique({
             where: { userId: req.user.id },
-            include: { wallet: true },
         })
 
         if (!volunteer) {

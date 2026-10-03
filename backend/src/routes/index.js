@@ -8,8 +8,8 @@ import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { getStats } from "../modules/admin/admin.controller.js";
-import { topUpWallet } from "../modules/wallet/wallet.controller.js";
-import { myDonations } from "../modules/donation/donation.controller.js";
+import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
+import { donateToVolunteer, myDonations } from "../modules/donation/donation.controller.js";
 
 const router = Router()
 
@@ -41,9 +41,11 @@ router.put("/volunteer/profile", requireAuth, requireActiveVolunteer, updateVolu
 router.get("/volunteer/:id", volunteerById)
 
 
-router.post("/wallet/top-up", requireAuth, requireActiveVolunteer, topUpWallet)
+router.get("/wallet/me", requireAuth, myWallet)
+router.post("/wallet/top-up", requireAuth, topUpWallet)
 
 
 router.get("/donations/me", requireAuth, myDonations)
+router.post("/donations/volunteer/:volunteerId", requireAuth, donateToVolunteer)
 
 export default router

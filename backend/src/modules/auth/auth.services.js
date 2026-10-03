@@ -33,6 +33,7 @@ export async function createUser({ name, email, password }) {
             name,
             email: email.toLowerCase(),
             password: hashedPassword,
+            wallet: { create: {} },
         }
     })
     return user;

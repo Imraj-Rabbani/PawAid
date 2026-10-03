@@ -80,6 +80,7 @@ enum PaymentMethod {
   NAGAD
   CARD
   BANK_TRANSFER
+  WALLET
   OTHER
 }
 
@@ -122,6 +123,7 @@ model User {
   createdAt DateTime   @default(now()) @map("created_at")
 
   volunteerProfile VolunteerProfile?
+  wallet Wallet?
   rescuePosts RescuePost[] @relation("PostCreator")
   comments Comment[]
   postReports PostReport[]
@@ -155,7 +157,6 @@ model VolunteerProfile {
   createdAt DateTime @default(now()) @map("created_at")
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])
-  wallet Wallet?
   assignedPosts RescuePost[] @relation("AssignedVolunteer")
   donations Donation[]
   expenses RescueExpense[]
@@ -271,12 +272,13 @@ model Donation {
 // WALLET
 // ========================================
 
+// Every user has exactly one wallet, created at sign up
 model Wallet {
   id String @id @default(uuid()) @db.Uuid
-  volunteerId String @unique @map("volunteer_id") @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
   balance Int @default(0)
   updatedAt DateTime @updatedAt @map("updated_at")
-  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions WalletTransaction[]
   @@map("wallets")
 }

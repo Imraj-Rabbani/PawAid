@@ -96,12 +96,7 @@ export default function ProfilePage() {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 isOwnProfile={isOwnProfile}
-                onWalletUpdated={(wallet) =>
-                  setUser((prev) => ({
-                    ...prev,
-                    volunteerProfile: { ...prev.volunteerProfile, wallet },
-                  }))
-                }
+                onWalletUpdated={(wallet) => setUser((prev) => ({ ...prev, wallet }))}
               />
             </aside>
 

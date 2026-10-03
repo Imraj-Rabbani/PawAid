@@ -14,7 +14,6 @@ const volunteerInclude = {
     },
   },
   rescueArea: true,
-  wallet: true,
 };
 
 
@@ -68,6 +67,30 @@ export async function volunteerById(req, res) {
           select: {
             ...publicVolunteerSelect.user.select,
             createdAt: true,
+            // Wallet history is public for transparency, but never who the money came from
+            wallet: {
+              select: {
+                balance: true,
+                transactions: {
+                  select: {
+                    id: true,
+                    amount: true,
+                    type: true,
+                    reference: true,
+                    createdAt: true,
+                    relatedTransaction: {
+                      select: {
+                        source: true,
+                        destination: true,
+                        relatedPost: { select: { id: true, title: true } },
+                      },
+                    },
+                  },
+                  orderBy: { createdAt: "desc" },
+                  take: 20,
+                },
+              },
+            },
           },
         },
         assignedPosts: {
@@ -81,30 +104,6 @@ export async function volunteerById(req, res) {
           orderBy: { createdAt: "desc" },
           take: 5,
         },
-        // Wallet history is public for transparency, but never who the money came from
-        wallet: {
-          select: {
-            balance: true,
-            transactions: {
-              select: {
-                id: true,
-                amount: true,
-                type: true,
-                reference: true,
-                createdAt: true,
-                relatedTransaction: {
-                  select: {
-                    source: true,
-                    destination: true,
-                    relatedPost: { select: { id: true, title: true } },
-                  },
-                },
-              },
-              orderBy: { createdAt: "desc" },
-              take: 20,
-            },
-          },
-        },
       },
     }).catch(() => null)
 
@@ -112,28 +111,41 @@ export async function volunteerById(req, res) {
       return res.status(404).json({ message: "Volunteer not found" })
     }
 
-    const [totalRescues, resolvedRescues, walletTotals] = await Promise.all([
+    const [totalRescues, resolvedRescues, walletTotals, donations] = await Promise.all([
       prisma.rescuePost.count({ where: { assignedVolunteerId: id } }),
       prisma.rescuePost.count({ where: { assignedVolunteerId: id, status: "RESOLVED" } }),
       prisma.walletTransaction.groupBy({
         by: ["type"],
-        where: { wallet: { volunteerId: id } },
+        where: { wallet: { userId: profile.user.id } },
         _sum: { amount: true },
+      }),
+      prisma.donation.aggregate({
+        where: { volunteerId: id },
+        _sum: { amount: true },
+        _count: true,
       }),
     ])
 
     const sumOf = (type) => walletTotals.find((t) => t.type === type)?._sum.amount ?? 0
 
+    const { wallet, ...user } = profile.user
+
     return res.json({
       message: "Successfully sent the volunteer",
       data: {
         ...profile,
-        wallet: profile.wallet && {
-          ...profile.wallet,
+        user,
+        wallet: wallet && {
+          ...wallet,
           totalReceived: sumOf("CREDIT"),
           totalSpent: sumOf("DEBIT"),
         },
-        stats: { totalRescues, resolvedRescues },
+        stats: {
+          totalRescues,
+          resolvedRescues,
+          donationsReceived: donations._sum.amount ?? 0,
+          donationCount: donations._count,
+        },
       },
     })
   } catch (error) {
@@ -175,13 +187,6 @@ export async function volunteerApplication(req, res) {
           nid,
           description: description || null,
           status: "ACTIVE",
-        },
-      });
-
-      await tx.wallet.create({
-        data: {
-          volunteerId: profile.id,
-          balance: 0,
         },
       });
 
