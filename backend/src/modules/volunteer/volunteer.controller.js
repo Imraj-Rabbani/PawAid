@@ -55,6 +55,94 @@ export async function volunteers(req, res) {
 }
 
 
+export async function volunteerById(req, res) {
+  try {
+    const { id } = req.params
+
+    // a malformed id makes the lookup throw, treat it the same as a missing volunteer
+    const profile = await prisma.volunteerProfile.findUnique({
+      where: { id },
+      select: {
+        ...publicVolunteerSelect,
+        user: {
+          select: {
+            ...publicVolunteerSelect.user.select,
+            createdAt: true,
+          },
+        },
+        assignedPosts: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            rescueArea: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+        // Wallet history is public for transparency, but never who the money came from
+        wallet: {
+          select: {
+            balance: true,
+            transactions: {
+              select: {
+                id: true,
+                amount: true,
+                type: true,
+                reference: true,
+                createdAt: true,
+                relatedTransaction: {
+                  select: {
+                    source: true,
+                    destination: true,
+                    relatedPost: { select: { id: true, title: true } },
+                  },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 20,
+            },
+          },
+        },
+      },
+    }).catch(() => null)
+
+    if (!profile || ["INACTIVE", "SUSPENDED"].includes(profile.status)) {
+      return res.status(404).json({ message: "Volunteer not found" })
+    }
+
+    const [totalRescues, resolvedRescues, walletTotals] = await Promise.all([
+      prisma.rescuePost.count({ where: { assignedVolunteerId: id } }),
+      prisma.rescuePost.count({ where: { assignedVolunteerId: id, status: "RESOLVED" } }),
+      prisma.walletTransaction.groupBy({
+        by: ["type"],
+        where: { wallet: { volunteerId: id } },
+        _sum: { amount: true },
+      }),
+    ])
+
+    const sumOf = (type) => walletTotals.find((t) => t.type === type)?._sum.amount ?? 0
+
+    return res.json({
+      message: "Successfully sent the volunteer",
+      data: {
+        ...profile,
+        wallet: profile.wallet && {
+          ...profile.wallet,
+          totalReceived: sumOf("CREDIT"),
+          totalSpent: sumOf("DEBIT"),
+        },
+        stats: { totalRescues, resolvedRescues },
+      },
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch volunteer" });
+  }
+}
+
+
 export async function volunteerApplication(req, res) {
   try {
     const userId = req.user.id

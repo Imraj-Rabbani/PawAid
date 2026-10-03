@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { login, register } from "../modules/auth/auth.controller.js";
-import { updateVolunteerProfile, volunteer, volunteerApplication, volunteers } from "../modules/volunteer/volunteer.controller.js";
+import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, createPost, listAreas, listPosts } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
@@ -35,6 +35,8 @@ router.get("/volunteer", volunteers)
 router.post("/volunteer/apply", requireAuth, volunteerApplication)
 router.get("/volunteer/profile", requireAuth, volunteer)
 router.put("/volunteer/profile", requireAuth, updateVolunteerProfile)
+// keep after /volunteer/profile so "profile" is not treated as an id
+router.get("/volunteer/:id", volunteerById)
 
 
 router.post("/wallet/top-up", requireAuth, topUpWallet)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 
@@ -88,10 +89,10 @@ export default function VolunteersPage() {
 }
 
 function VolunteerCard({ volunteer }) {
-  const { user, rescueArea, description } = volunteer;
+  const { id, user, rescueArea, description } = volunteer;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col">
       <div className="flex items-center gap-4">
         <img
           src={user.profilePictureUrl || "/default-avatar.png"}
@@ -109,6 +110,15 @@ function VolunteerCard({ volunteer }) {
       <p className="mt-4 text-sm text-gray-500 line-clamp-3 whitespace-pre-wrap">
         {description || "No description provided."}
       </p>
+
+      <div className="mt-auto pt-4">
+        <Link
+          to={`/volunteers/${id}`}
+          className="inline-block px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          View profile
+        </Link>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import SignUp from "./pages/Signup"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import VolunteersPage from "./pages/VolunteersPage"
+import VolunteerProfilePage from "./pages/VolunteerProfilePage"
 import NotFound from "./pages/NotFound"
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
         <Route path="/" element={<Homepage/>} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/volunteers" element={<VolunteersPage />} />
+        <Route path="/volunteers/:volunteerId" element={<VolunteerProfilePage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/signin" element={<SignIn/>} />
         <Route path="/signup" element={<SignUp/>} />
