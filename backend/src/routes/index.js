@@ -6,8 +6,10 @@ import { addArea, createPost, listAreas, listPosts } from "../modules/rescue/res
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
+import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { getStats } from "../modules/admin/admin.controller.js";
 import { topUpWallet } from "../modules/wallet/wallet.controller.js";
+import { myDonations } from "../modules/donation/donation.controller.js";
 
 const router = Router()
 
@@ -34,11 +36,14 @@ router.get("/admin/stats", requireAuth, requireAdmin, getStats)
 router.get("/volunteer", volunteers)
 router.post("/volunteer/apply", requireAuth, volunteerApplication)
 router.get("/volunteer/profile", requireAuth, volunteer)
-router.put("/volunteer/profile", requireAuth, updateVolunteerProfile)
+router.put("/volunteer/profile", requireAuth, requireActiveVolunteer, updateVolunteerProfile)
 // keep after /volunteer/profile so "profile" is not treated as an id
 router.get("/volunteer/:id", volunteerById)
 
 
-router.post("/wallet/top-up", requireAuth, topUpWallet)
+router.post("/wallet/top-up", requireAuth, requireActiveVolunteer, topUpWallet)
+
+
+router.get("/donations/me", requireAuth, myDonations)
 
 export default router

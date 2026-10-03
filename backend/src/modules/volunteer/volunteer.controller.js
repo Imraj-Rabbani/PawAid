@@ -242,9 +242,6 @@ export async function updateVolunteerProfile(req, res){
     const userId = req.user.id;
     const { rescueAreaId, nid, description } = req.body;
 
-    const existing = await prisma.volunteerProfile.findUnique({ where: { userId } });
-    if (!existing) return res.status(404).json({ message: "Volunteer profile not found" });
-
     if (rescueAreaId) {
       const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } }).catch(() => null);
       if (!area) return res.status(400).json({ message: "Invalid rescue area" });

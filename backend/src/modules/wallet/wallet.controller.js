@@ -24,12 +24,9 @@ export async function topUpWallet(req, res) {
     const { amount } = parsed.data
     const userId = req.user.id
 
-    const volunteer = await prisma.volunteerProfile.findUnique({
-      where: { userId },
-      include: { wallet: true },
-    })
+    const volunteer = req.volunteer
 
-    if (!volunteer?.wallet) {
+    if (!volunteer.wallet) {
       return res.status(403).json({ message: "Only volunteers have a wallet" })
     }
 

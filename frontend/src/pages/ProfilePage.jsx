@@ -111,7 +111,7 @@ export default function ProfilePage() {
                 {activeTab === "Profile" && (
                   <ProfileTab key={user.id} user={user} setUser={setUser} isOwnProfile={isOwnProfile} />
                 )}
-                {activeTab === "Donations" && <DonationsTab />}
+                {activeTab === "Donations" && <DonationsTab isVolunteer={!!user.volunteerProfile} />}
                 {activeTab === "Rescues" && <EmptyTab title="Rescues" />}
                 {activeTab === "Address" && <EmptyTab title="Address" />}
                 {activeTab === "Orders" && <EmptyTab title="Orders" />}

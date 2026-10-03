@@ -6,6 +6,8 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // load includes with one joined query instead of one query per relation
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

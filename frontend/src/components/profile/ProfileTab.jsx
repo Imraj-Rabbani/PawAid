@@ -133,7 +133,7 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
         <div className="mt-10 pt-6 border-t border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Volunteer Information</h3>
-            {isOwnProfile && !editingVolunteer && (
+            {isOwnProfile && user.volunteerProfile.status === "ACTIVE" && !editingVolunteer && (
               <button
                 onClick={() => setEditingVolunteer(true)}
                 className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50"

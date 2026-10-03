@@ -59,7 +59,7 @@ export default function Sidebar({
         {user.volunteerProfile?.wallet && (
           <WalletCard
             wallet={user.volunteerProfile.wallet}
-            canTopUp={isOwnProfile}
+            canTopUp={isOwnProfile && user.volunteerProfile.status === "ACTIVE"}
             onToppedUp={onWalletUpdated}
           />
         )}

@@ -67,6 +67,13 @@ export async function login(req, res) {
         });
     }
 
+    // checked after the password so the response can't be used to probe account status
+    if (user.status !== "ACTIVE") {
+        return res.status(403).json({
+            message: "Your account has been suspended. Please contact support.",
+        });
+    }
+
     const token = generateToken({
         userId: user.id,
         email: user.email

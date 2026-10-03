@@ -29,6 +29,11 @@ export async function requireAuth(req, res, next) {
             return res.status(401).json({ message: "User no longer exists" });
         }
 
+        // 401 so the frontend drops the stored token and signs a suspended user out
+        if (user.status !== "ACTIVE") {
+            return res.status(401).json({ message: "Your account has been suspended" });
+        }
+
         req.user = {
             id: user.id,
             name: user.name,
