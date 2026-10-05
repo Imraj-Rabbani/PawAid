@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import CommentSection from "./CommentSection";
 
 const STATUS = {
   OPEN: { label: "Awaiting volunteer", className: "bg-yellow-100 text-yellow-700" },
@@ -23,8 +24,10 @@ function timeAgo(date) {
   return new Date(date).toLocaleDateString();
 }
 
-export default function PostCard({ post }) {
+export default function PostCard({ post, user }) {
   const [expanded, setExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentCount, setCommentCount] = useState(post._count?.comments ?? 0);
 
   const { creator, rescueArea, images } = post;
   const status = STATUS[post.status] || STATUS.OPEN;
@@ -135,6 +138,26 @@ export default function PostCard({ post }) {
             />
           </div>
         </div>
+      )}
+
+      {/* ── Comments ── */}
+      <div className="border-t border-gray-100 px-4 sm:px-6 py-2">
+        <button
+          onClick={() => setShowComments((v) => !v)}
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          {commentCount === 0
+            ? "Comment"
+            : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+        </button>
+      </div>
+      {showComments && (
+        <CommentSection
+          postId={post.id}
+          user={user}
+          timeAgo={timeAgo}
+          onCountChange={(delta) => setCommentCount((n) => n + delta)}
+        />
       )}
     </article>
   );

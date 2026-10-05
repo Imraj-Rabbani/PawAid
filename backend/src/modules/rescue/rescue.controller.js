@@ -21,6 +21,7 @@ const postInclude = {
     },
     rescueArea: true,
     images: true,
+    _count: { select: { comments: true } },
 };
 
 

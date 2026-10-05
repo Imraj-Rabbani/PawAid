@@ -10,6 +10,7 @@ import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { getStats } from "../modules/admin/admin.controller.js";
 import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
 import { donateToVolunteer, myDonations } from "../modules/donation/donation.controller.js";
+import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
 
 const router = Router()
 
@@ -28,6 +29,9 @@ router.post("/add-area", requireAuth, requireAdmin, addArea)
 
 router.get("/rescue-post", listPosts)
 router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
+router.get("/rescue-post/:postId/comments", listComments)
+router.post("/rescue-post/:postId/comments", requireAuth, createComment)
+router.delete("/comments/:commentId", requireAuth, deleteComment)
 
 
 router.get("/admin/stats", requireAuth, requireAdmin, getStats)

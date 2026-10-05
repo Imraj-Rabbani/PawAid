@@ -70,7 +70,7 @@ export default function Homepage() {
         ) : (
           <>
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard key={post.id} post={post} user={user} />
             ))}
 
             {nextCursor && (
