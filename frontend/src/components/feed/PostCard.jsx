@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import CommentSection from "./CommentSection";
 import ReportPostModal from "./ReportPostModal";
+import ImageLightbox from "./ImageLightbox";
 
 const STATUS = {
   OPEN: { label: "Awaiting volunteer", className: "bg-yellow-100 text-yellow-700" },
@@ -28,6 +29,9 @@ function timeAgo(date) {
 
 export default function PostCard({ post, user }) {
   const [expanded, setExpanded] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  // stable so the lightbox doesn't redo its setup on every render
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
   // status and volunteer change in place when a volunteer takes the rescue
   const [assignment, setAssignment] = useState({
     status: post.status,
@@ -205,12 +209,12 @@ export default function PostCard({ post, user }) {
           className={`grid gap-0.5 ${shownImages.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
         >
           {shownImages.map((image, index) => (
-            <a
+            <button
               key={image.id}
-              href={image.imageUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={`relative block bg-gray-100 ${
+              type="button"
+              onClick={() => setLightboxIndex(index)}
+              aria-label={`View image ${index + 1} of ${images.length}`}
+              className={`relative block bg-gray-100 overflow-hidden cursor-zoom-in hover:brightness-95 transition ${
                 shownImages.length === 3 && index === 0 ? "col-span-2" : ""
               }`}
             >
@@ -227,9 +231,17 @@ export default function PostCard({ post, user }) {
                   +{hiddenCount}
                 </span>
               )}
-            </a>
+            </button>
           ))}
         </div>
+      )}
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={images}
+          startIndex={lightboxIndex}
+          alt={post.title}
+          onClose={closeLightbox}
+        />
       )}
 
       {/* ── Donation progress ── */}
