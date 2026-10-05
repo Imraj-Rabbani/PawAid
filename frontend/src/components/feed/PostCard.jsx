@@ -28,6 +28,12 @@ function timeAgo(date) {
 
 export default function PostCard({ post, user }) {
   const [expanded, setExpanded] = useState(false);
+  // status and volunteer change in place when a volunteer takes the rescue
+  const [assignment, setAssignment] = useState({
+    status: post.status,
+    assignedVolunteer: post.assignedVolunteer,
+  });
+  const [assigning, setAssigning] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments ?? 0);
   const [upvoted, setUpvoted] = useState(Boolean(post.upvoted));
@@ -38,7 +44,11 @@ export default function PostCard({ post, user }) {
   const navigate = useNavigate();
 
   const { creator, rescueArea, images } = post;
-  const status = STATUS[post.status] || STATUS.OPEN;
+  const status = STATUS[assignment.status] || STATUS.OPEN;
+  const { assignedVolunteer } = assignment;
+  // the server checks the volunteer is still active, this only decides whether to show the button
+  const canAssign =
+    user?.role === "VOLUNTEER" && assignment.status === "OPEN" && !assignedVolunteer;
   const isLong = post.description.length > LONG_DESCRIPTION;
   const shownImages = images.slice(0, MAX_IMAGES_SHOWN);
   const hiddenCount = images.length - shownImages.length;
@@ -74,6 +84,26 @@ export default function PostCard({ post, user }) {
       alert(err.response?.data?.message || "Failed to update upvote");
     } finally {
       setUpvoting(false);
+    }
+  };
+
+  const assignToMe = async () => {
+    if (!confirm("Take responsibility for this rescue? Any donations it has raised will move to your wallet.")) {
+      return;
+    }
+
+    try {
+      setAssigning(true);
+      const res = await api.post(`/rescue-post/${post.id}/assign`);
+      setAssignment({
+        status: res.data.data.status,
+        assignedVolunteer: res.data.data.assignedVolunteer,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to assign rescue");
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -133,6 +163,41 @@ export default function PostCard({ post, user }) {
           </button>
         )}
       </div>
+
+      {/* ── Volunteer ── */}
+      {(assignedVolunteer || canAssign) && (
+        <div className="mx-4 sm:mx-6 mb-4 flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50">
+          {assignedVolunteer ? (
+            <>
+              <img
+                src={assignedVolunteer.user.profilePictureUrl || "/default-avatar.png"}
+                alt={assignedVolunteer.user.name}
+                className="w-8 h-8 rounded-full object-cover shrink-0"
+              />
+              <p className="text-sm text-gray-700 min-w-0">
+                <Link
+                  to={`/volunteers/${assignedVolunteer.id}`}
+                  className="font-semibold text-gray-900 hover:text-blue-700"
+                >
+                  {assignedVolunteer.user.name}
+                </Link>{" "}
+                is handling this rescue
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="flex-1 text-sm text-gray-700">No volunteer has taken this rescue yet.</p>
+              <button
+                onClick={assignToMe}
+                disabled={assigning}
+                className="shrink-0 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {assigning ? "Assigning..." : "Take this rescue"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Images ── */}
       {shownImages.length > 0 && (

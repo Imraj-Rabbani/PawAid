@@ -1,6 +1,7 @@
 import z from "zod";
 import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
+import { creditWallet } from "../../services/wallet.services.js";
 
 
 const postSchema = z.object({
@@ -21,6 +22,12 @@ const postInclude = {
     },
     rescueArea: true,
     images: true,
+    assignedVolunteer: {
+        select: {
+            id: true,
+            user: { select: { id: true, name: true, profilePictureUrl: true } },
+        },
+    },
     _count: { select: { comments: true, upvotes: true } },
 };
 
@@ -207,5 +214,91 @@ export async function removeUpvote(req, res){
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to remove upvote" });
+    }
+}
+
+class PostNotAssignableError extends Error {}
+
+// An active volunteer takes responsibility for a rescue. Any donations the post
+// collected while unassigned move to their wallet in the same transaction (PRD §9).
+export async function assignPost(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const volunteer = req.volunteer
+
+        const wallet = await prisma.wallet.findUnique({ where: { userId: volunteer.userId } })
+        if (!wallet) {
+            return res.status(404).json({ message: "Wallet not found" })
+        }
+
+        const post = await prisma.$transaction(async (tx) => {
+            // only an open, unassigned post can be claimed; doing the check in the update
+            // means two volunteers racing each other can't both get it
+            const { count } = await tx.rescuePost.updateMany({
+                where: { id: postId.data, status: "OPEN", assignedVolunteerId: null },
+                data: { assignedVolunteerId: volunteer.id, status: "ASSIGNED" },
+            })
+
+            if (count === 0) throw new PostNotAssignableError()
+
+            // read after the update, which holds the row lock, so a donation can't slip in between
+            const post = await tx.rescuePost.findUnique({
+                where: { id: postId.data },
+                include: postIncludeFor(req.user.id),
+            })
+
+            // the post was never assigned before, so everything it raised is still unassigned
+            if (post.donationReceived > 0) {
+                const transaction = await tx.financialTransaction.create({
+                    data: {
+                        type: "TRANSFER",
+                        source: "RESCUE_POST",
+                        destination: "VOLUNTEER",
+                        amount: post.donationReceived,
+                        relatedPostId: post.id,
+                        relatedVolunteerId: volunteer.id,
+                        relatedUserId: volunteer.userId,
+                        status: "COMPLETED",
+                        reference: "Unassigned rescue funds",
+                    },
+                })
+
+                await creditWallet(tx, {
+                    walletId: wallet.id,
+                    amount: post.donationReceived,
+                    transactionId: transaction.id,
+                    reference: `Donations for ${post.title}`,
+                })
+            }
+
+            return post
+        })
+
+        return res.json({
+            message: "Rescue assigned to you",
+            data: withUpvoted(post)
+        })
+    } catch (error) {
+        if (error instanceof PostNotAssignableError) {
+            const post = await prisma.rescuePost.findUnique({
+                where: { id: req.params.postId },
+                select: { assignedVolunteerId: true },
+            }).catch(() => null)
+
+            if (!post) {
+                return res.status(404).json({ message: "Post not found" })
+            }
+            return res.status(409).json({
+                message: post.assignedVolunteerId
+                    ? "This rescue already has a volunteer"
+                    : "This rescue is no longer open"
+            })
+        }
+        console.error(error);
+        res.status(500).json({ message: "Failed to assign rescue" });
     }
 }
