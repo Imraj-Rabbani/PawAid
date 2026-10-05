@@ -21,8 +21,20 @@ const postInclude = {
     },
     rescueArea: true,
     images: true,
-    _count: { select: { comments: true } },
+    _count: { select: { comments: true, upvotes: true } },
 };
+
+// Adds the viewer's own upvote (if any) so we can tell them whether they upvoted
+function postIncludeFor(userId) {
+    return userId
+        ? { ...postInclude, upvotes: { where: { userId }, select: { id: true } } }
+        : postInclude
+}
+
+// Swap the viewer's upvote rows for a simple flag
+function withUpvoted({ upvotes, ...post }) {
+    return { ...post, upvoted: Boolean(upvotes?.length) }
+}
 
 
 export async function addArea(req, res){
@@ -106,7 +118,7 @@ export async function createPost(req, res){
 
         return res.status(201).json({
             message: "Post created",
-            data: post
+            data: withUpvoted(post)
         })
     } catch (error) {
         console.error(error);
@@ -124,7 +136,7 @@ export async function listPosts(req, res){
             take: limit + 1,
             ...(cursor.success && { cursor: { id: cursor.data }, skip: 1 }),
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            include: postInclude,
+            include: postIncludeFor(req.user?.id),
         })
 
         const hasMore = posts.length > limit
@@ -132,11 +144,68 @@ export async function listPosts(req, res){
 
         return res.json({
             message: "Posts listed",
-            data: posts,
+            data: posts.map(withUpvoted),
             nextCursor: hasMore ? posts[posts.length - 1].id : null
         })
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to fetch posts" });
+    }
+}
+
+export async function upvotePost(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const post = await prisma.rescuePost.findUnique({
+            where: { id: postId.data },
+            select: { id: true },
+        })
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        // upsert so a double click doesn't fail on the unique pair
+        await prisma.postUpvote.upsert({
+            where: { postId_userId: { postId: post.id, userId: req.user.id } },
+            create: { postId: post.id, userId: req.user.id },
+            update: {},
+        })
+
+        const upvoteCount = await prisma.postUpvote.count({ where: { postId: post.id } })
+
+        return res.json({
+            message: "Post upvoted",
+            data: { upvoted: true, upvoteCount }
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to upvote post" });
+    }
+}
+
+export async function removeUpvote(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        await prisma.postUpvote.deleteMany({
+            where: { postId: postId.data, userId: req.user.id },
+        })
+
+        const upvoteCount = await prisma.postUpvote.count({ where: { postId: postId.data } })
+
+        return res.json({
+            message: "Upvote removed",
+            data: { upvoted: false, upvoteCount }
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to remove upvote" });
     }
 }

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import { addArea, createPost, listAreas, listPosts } from "../modules/rescue/rescue.controller.js";
+import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
+import { addArea, createPost, listAreas, listPosts, removeUpvote, upvotePost } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
@@ -11,6 +11,7 @@ import { getStats } from "../modules/admin/admin.controller.js";
 import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
 import { donateToVolunteer, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
+import { reportPost } from "../modules/report/report.controller.js";
 
 const router = Router()
 
@@ -27,11 +28,14 @@ router.get("/area", listAreas)
 router.post("/add-area", requireAuth, requireAdmin, addArea)
 
 
-router.get("/rescue-post", listPosts)
+router.get("/rescue-post", optionalAuth, listPosts)
 router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
 router.get("/rescue-post/:postId/comments", listComments)
 router.post("/rescue-post/:postId/comments", requireAuth, createComment)
 router.delete("/comments/:commentId", requireAuth, deleteComment)
+router.post("/rescue-post/:postId/upvote", requireAuth, upvotePost)
+router.delete("/rescue-post/:postId/upvote", requireAuth, removeUpvote)
+router.post("/rescue-post/:postId/report", requireAuth, reportPost)
 
 
 router.get("/admin/stats", requireAuth, requireAdmin, getStats)

@@ -49,3 +49,30 @@ export async function requireAuth(req, res, next) {
     }
 
 }
+
+// For public routes that show extra details to a signed in user (e.g. which posts they upvoted).
+// A missing or bad token is not an error here, the request just continues as a guest.
+export async function optionalAuth(req, res, next) {
+    try {
+        const authHeader = req.headers.authorization
+
+        if (authHeader?.startsWith("Bearer ")) {
+            const decoded = verifyToken(authHeader.split(" ")[1].trim())
+            const user = await findById(decoded.userId)
+
+            if (user && user.status === "ACTIVE") {
+                req.user = {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    status: user.status,
+                };
+            }
+        }
+    } catch {
+        // treat as a guest
+    }
+
+    next()
+}

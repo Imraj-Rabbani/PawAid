@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../../services/api";
 import CommentSection from "./CommentSection";
+import ReportPostModal from "./ReportPostModal";
 
 const STATUS = {
   OPEN: { label: "Awaiting volunteer", className: "bg-yellow-100 text-yellow-700" },
@@ -28,6 +30,12 @@ export default function PostCard({ post, user }) {
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments ?? 0);
+  const [upvoted, setUpvoted] = useState(Boolean(post.upvoted));
+  const [upvoteCount, setUpvoteCount] = useState(post._count?.upvotes ?? 0);
+  const [upvoting, setUpvoting] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reported, setReported] = useState(false);
+  const navigate = useNavigate();
 
   const { creator, rescueArea, images } = post;
   const status = STATUS[post.status] || STATUS.OPEN;
@@ -37,6 +45,45 @@ export default function PostCard({ post, user }) {
   const progress = post.donationTarget
     ? Math.min(100, Math.round((post.donationReceived / post.donationTarget) * 100))
     : 0;
+
+  const isOwnPost = user?.id === creator.id;
+
+  const toggleUpvote = async () => {
+    if (!user) {
+      navigate("/signin");
+      return;
+    }
+    if (upvoting) return;
+
+    // update right away, then settle on the count the server returns
+    const next = !upvoted;
+    setUpvoted(next);
+    setUpvoteCount((n) => n + (next ? 1 : -1));
+
+    try {
+      setUpvoting(true);
+      const res = next
+        ? await api.post(`/rescue-post/${post.id}/upvote`)
+        : await api.delete(`/rescue-post/${post.id}/upvote`);
+      setUpvoted(res.data.data.upvoted);
+      setUpvoteCount(res.data.data.upvoteCount);
+    } catch (err) {
+      console.error(err);
+      setUpvoted(!next);
+      setUpvoteCount((n) => n + (next ? -1 : 1));
+      alert(err.response?.data?.message || "Failed to update upvote");
+    } finally {
+      setUpvoting(false);
+    }
+  };
+
+  const openReport = () => {
+    if (!user) {
+      navigate("/signin");
+      return;
+    }
+    setShowReport(true);
+  };
 
   return (
     <article className="bg-white rounded-2xl shadow-sm border border-gray-200">
@@ -140,16 +187,46 @@ export default function PostCard({ post, user }) {
         </div>
       )}
 
-      {/* ── Comments ── */}
-      <div className="border-t border-gray-100 px-4 sm:px-6 py-2">
+      {/* ── Actions ── */}
+      <div className="border-t border-gray-100 px-4 sm:px-6 py-2 flex items-center gap-1">
+        <button
+          onClick={toggleUpvote}
+          aria-pressed={upvoted}
+          className={`flex items-center gap-1.5 px-2 py-1 -ml-2 text-sm font-medium rounded-lg hover:bg-gray-50 ${
+            upvoted ? "text-blue-600" : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-4 h-4"
+            fill={upvoted ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          >
+            <path d="M12 4l8 9h-5v7H9v-7H4z" />
+          </svg>
+          {upvoteCount > 0 ? upvoteCount : "Upvote"}
+        </button>
+
         <button
           onClick={() => setShowComments((v) => !v)}
-          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+          className="px-2 py-1 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900"
         >
           {commentCount === 0
             ? "Comment"
             : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
         </button>
+
+        {!isOwnPost && (
+          <button
+            onClick={openReport}
+            disabled={reported}
+            className="ml-auto px-2 py-1 text-sm font-medium text-gray-500 rounded-lg hover:bg-gray-50 hover:text-red-600 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+          >
+            {reported ? "Reported" : "Report"}
+          </button>
+        )}
       </div>
       {showComments && (
         <CommentSection
@@ -157,6 +234,16 @@ export default function PostCard({ post, user }) {
           user={user}
           timeAgo={timeAgo}
           onCountChange={(delta) => setCommentCount((n) => n + delta)}
+        />
+      )}
+      {showReport && (
+        <ReportPostModal
+          postId={post.id}
+          onClose={() => setShowReport(false)}
+          onReported={() => {
+            setShowReport(false);
+            setReported(true);
+          }}
         />
       )}
     </article>

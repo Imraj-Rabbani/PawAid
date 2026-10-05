@@ -127,6 +127,7 @@ model User {
   rescuePosts RescuePost[] @relation("PostCreator")
   comments Comment[]
   postReports PostReport[]
+  postUpvotes PostUpvote[]
   donations Donation[]
   orders Order[]
   financialTransactions FinancialTransaction[] @relation("RelatedUser")
@@ -185,6 +186,7 @@ model RescuePost {
   images RescuePostImage[]
   comments Comment[]
   reports PostReport[]
+  upvotes PostUpvote[]
   donations Donation[]
   expenses RescueExpense[]
   financialTransactions FinancialTransaction[] @relation("RelatedPost")
@@ -223,6 +225,24 @@ model Comment {
   @@index([postId])
   @@index([authorId])
   @@map("comments")
+}
+
+// ========================================
+// POST UPVOTE
+// ========================================
+
+// One row per user per post, the unique pair stops double upvotes
+model PostUpvote {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @map("post_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  post RescuePost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("post_upvotes")
 }
 
 // ========================================
