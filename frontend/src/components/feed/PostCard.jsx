@@ -152,7 +152,7 @@ export default function PostCard({ post, user }) {
       <div className="px-4 sm:px-6 py-4">
         <h3 className="font-semibold text-gray-900">{post.title}</h3>
         <p
-          className={`mt-1 text-sm text-gray-700 whitespace-pre-wrap break-words ${
+          className={`mt-1 text-sm text-gray-700 whitespace-pre-wrap wrap-break-word ${
             isLong && !expanded ? "line-clamp-4" : ""
           }`}
         >
@@ -223,7 +223,7 @@ export default function PostCard({ post, user }) {
                 alt={post.title}
                 loading="lazy"
                 className={`w-full object-cover ${
-                  shownImages.length === 1 ? "max-h-[32rem]" : "h-56"
+                  shownImages.length === 1 ? "max-h-[128]" : "h-56"
                 }`}
               />
               {hiddenCount > 0 && index === shownImages.length - 1 && (

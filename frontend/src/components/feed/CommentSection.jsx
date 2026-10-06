@@ -126,7 +126,7 @@ export default function CommentSection({ postId, user, timeAgo, onCountChange })
                     >
                       {comment.author.name}
                     </Link>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
                       {comment.text}
                     </p>
                   </div>

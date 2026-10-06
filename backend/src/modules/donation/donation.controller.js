@@ -22,6 +22,30 @@ const donationSelect = {
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
 
+// Every donation on the platform, newest first, showing who gave to whom
+export async function listDonations(req, res) {
+  try {
+    const donations = await prisma.donation.findMany({
+      select: {
+        ...donationSelect,
+        donor: { select: publicUserSelect },
+        volunteer: { select: { id: true, user: { select: publicUserSelect } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    })
+
+    return res.json({
+      message: "Donations listed",
+      data: donations,
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch donations" });
+  }
+}
+
+
 // Donations the signed in user made, and (for volunteers) the ones they received
 export async function myDonations(req, res) {
   try {

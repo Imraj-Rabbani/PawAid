@@ -12,7 +12,6 @@ export default function Navbar({ user: userProp }) {
 
   const links = [
     { label: "Home", path: "/" },
-    { label: "Rescues", path: "/rescues" },
     { label: "Volunteers", path: "/volunteers" },
     { label: "Donations", path: "/donations" },
     { label: "About", path: "/about" },
