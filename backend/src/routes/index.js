@@ -11,6 +11,7 @@ import { getStats } from "../modules/admin/admin.controller.js";
 import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
 import { donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
+import { homeSummary } from "../modules/home/home.controller.js";
 import { reportPost } from "../modules/report/report.controller.js";
 
 const router = Router()
@@ -22,6 +23,9 @@ router.post("/signin", login)
 router.get("/profile/:userId", requireAuth, getUserProfile)
 router.put("/profile/update", requireAuth, updateProfile)
 router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"), updateProfilePicture)
+
+
+router.get("/home/summary", optionalAuth, homeSummary)
 
 
 router.get("/area", listAreas)

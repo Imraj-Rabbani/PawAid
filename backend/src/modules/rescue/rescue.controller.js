@@ -133,13 +133,22 @@ export async function createPost(req, res){
     }
 }
 
+// Feed tabs on the homepage
+const POST_FILTERS = {
+    open: { status: "OPEN", assignedVolunteerId: null },
+    fundraising: { donationTarget: { gt: 0 }, status: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] } },
+    rescued: { status: "RESOLVED" },
+};
+
 export async function listPosts(req, res){
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
         const cursor = z.uuid().safeParse(req.query.cursor)
+        const where = Object.hasOwn(POST_FILTERS, req.query.filter) ? POST_FILTERS[req.query.filter] : {}
 
         // newest first, one extra row tells us whether there is another page
         const posts = await prisma.rescuePost.findMany({
+            where,
             take: limit + 1,
             ...(cursor.success && { cursor: { id: cursor.data }, skip: 1 }),
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],

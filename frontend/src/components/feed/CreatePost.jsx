@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import Icon from "../Icon";
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB, same as the backend limit
@@ -13,7 +14,7 @@ const emptyForm = {
 };
 
 const inputClass =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full px-3 py-2 bg-surface-container-low border border-transparent rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary-container";
 
 export default function CreatePost({ user, onCreated }) {
   const [open, setOpen] = useState(false);
@@ -39,10 +40,10 @@ export default function CreatePost({ user, onCreated }) {
 
   if (!user) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
-        <p className="text-sm text-gray-700">
+      <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-6 text-center">
+        <p className="text-sm text-on-surface-variant">
           Seen an animal that needs help?{" "}
-          <Link to="/signin" className="font-semibold text-blue-600 hover:text-blue-700">
+          <Link to="/signin" className="font-semibold text-primary hover:text-primary-container">
             Sign in
           </Link>{" "}
           to post a rescue request.
@@ -111,18 +112,32 @@ export default function CreatePost({ user, onCreated }) {
 
   if (!open) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 flex items-center gap-3">
-        <img
-          src={user.profilePictureUrl || "/default-avatar.png"}
-          alt={user.name}
-          className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100 shrink-0"
-        />
-        <button
-          onClick={() => setOpen(true)}
-          className="flex-1 text-left px-4 py-2.5 text-sm text-gray-500 bg-gray-100 rounded-full hover:bg-gray-200 transition"
-        >
-          Seen an animal that needs help? Post a rescue request...
-        </button>
+      <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <img
+            src={user.profilePictureUrl || "/default-avatar.png"}
+            alt={user.name}
+            className="w-10 h-10 rounded-full object-cover ring-1 ring-surface-container-high shrink-0"
+          />
+          <button
+            onClick={() => setOpen(true)}
+            className="flex-1 text-left px-4 py-2.5 text-[13px] text-on-surface-variant bg-surface-container-low rounded-xl hover:bg-surface-container-high transition"
+          >
+            Report an animal in need or start a rescue fund...
+          </button>
+        </div>
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-1">
+            <ComposerShortcut icon="photo_camera" label="Photos" onClick={() => setOpen(true)} />
+            <ComposerShortcut icon="savings" label="Fundraise" onClick={() => setOpen(true)} />
+          </div>
+          <button
+            onClick={() => setOpen(true)}
+            className="bg-primary hover:bg-primary-container text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition"
+          >
+            Publish Post
+          </button>
+        </div>
       </div>
     );
   }
@@ -130,19 +145,19 @@ export default function CreatePost({ user, onCreated }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6"
+      className="bg-surface-container-lowest rounded-2xl shadow-sm p-4 sm:p-6"
     >
-      <h2 className="text-lg font-semibold text-gray-900">Create a rescue post</h2>
+      <h2 className="font-display text-lg font-semibold text-on-surface">Create a rescue post</h2>
 
       {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mt-4 p-3 bg-error-container rounded-xl">
+          <p className="text-sm text-on-error-container">{error}</p>
         </div>
       )}
 
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
-          <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Title</label>
+          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-1 block">Title</label>
           <input
             required
             minLength={3}
@@ -155,7 +170,7 @@ export default function CreatePost({ user, onCreated }) {
         </div>
 
         <div className="sm:col-span-2">
-          <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">
+          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-1 block">
             Description
           </label>
           <textarea
@@ -170,14 +185,14 @@ export default function CreatePost({ user, onCreated }) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">
+          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-1 block">
             Rescue Area
           </label>
           <select
             required
             value={form.rescueAreaId}
             onChange={(e) => setForm({ ...form, rescueAreaId: e.target.value })}
-            className={`${inputClass} bg-white`}
+            className={inputClass}
           >
             <option value="">Select an area</option>
             {areas.map((area) => (
@@ -189,7 +204,7 @@ export default function CreatePost({ user, onCreated }) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">
+          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-1 block">
             Donation Target (৳, optional)
           </label>
           <input
@@ -212,7 +227,7 @@ export default function CreatePost({ user, onCreated }) {
               <img
                 src={image.url}
                 alt="Selected"
-                className="w-full h-20 rounded-lg object-cover"
+                className="w-full h-20 rounded-xl object-cover"
               />
               <button
                 type="button"
@@ -229,10 +244,11 @@ export default function CreatePost({ user, onCreated }) {
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <label
-          className={`px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 cursor-pointer ${
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-on-surface-variant bg-surface-container-low rounded-xl hover:bg-surface-container-high cursor-pointer ${
             images.length >= MAX_IMAGES ? "opacity-50 pointer-events-none" : ""
           }`}
         >
+          <Icon name="photo_camera" className="text-[18px]" />
           Add Photos ({images.length}/{MAX_IMAGES})
           <input
             type="file"
@@ -249,19 +265,32 @@ export default function CreatePost({ user, onCreated }) {
             type="button"
             onClick={reset}
             disabled={posting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold text-on-surface bg-surface-container-high rounded-xl hover:bg-surface-container-highest disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={posting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-bold text-white bg-primary rounded-xl shadow-sm hover:bg-primary-container disabled:opacity-50"
           >
-            {posting ? "Posting..." : "Post"}
+            {posting ? "Publishing..." : "Publish Post"}
           </button>
         </div>
       </div>
     </form>
+  );
+}
+
+function ComposerShortcut({ icon, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-lg transition-colors flex items-center gap-1.5"
+    >
+      <Icon name={icon} className="text-[18px]" />
+      <span className="hidden sm:inline text-[11px] font-medium">{label}</span>
+    </button>
   );
 }

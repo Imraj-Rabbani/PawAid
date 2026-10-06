@@ -4,14 +4,15 @@ import api from "../../services/api";
 import CommentSection from "./CommentSection";
 import ReportPostModal from "./ReportPostModal";
 import ImageLightbox from "./ImageLightbox";
+import Icon from "../Icon";
 
 const STATUS = {
-  OPEN: { label: "Awaiting volunteer", className: "bg-yellow-100 text-yellow-700" },
-  ASSIGNED: { label: "Assigned", className: "bg-blue-100 text-blue-700" },
-  IN_PROGRESS: { label: "In progress", className: "bg-blue-100 text-blue-700" },
-  RESOLVED: { label: "Rescued", className: "bg-green-100 text-green-700" },
-  CLOSED: { label: "Closed", className: "bg-gray-100 text-gray-700" },
-  CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-700" },
+  OPEN: { label: "Awaiting Volunteer", className: "bg-error-container text-on-error-container" },
+  ASSIGNED: { label: "Assigned", className: "bg-secondary-container text-on-secondary-container" },
+  IN_PROGRESS: { label: "In Progress", className: "bg-secondary-container text-on-secondary-container" },
+  RESOLVED: { label: "Rescued", className: "bg-secondary-container text-on-secondary-container" },
+  CLOSED: { label: "Closed", className: "bg-surface-container-high text-on-surface-variant" },
+  CANCELLED: { label: "Cancelled", className: "bg-surface-container-high text-on-surface-variant" },
 };
 
 const MAX_IMAGES_SHOWN = 4;
@@ -61,6 +62,9 @@ export default function PostCard({ post, user }) {
     : 0;
 
   const isOwnPost = user?.id === creator.id;
+  const fullyFunded = progress >= 100;
+  // donations reach a rescue through the volunteer handling it
+  const canDonate = assignedVolunteer && assignedVolunteer.user.id !== user?.id;
 
   const toggleUpvote = async () => {
     if (!user) {
@@ -120,39 +124,61 @@ export default function PostCard({ post, user }) {
   };
 
   return (
-    <article className="bg-white rounded-2xl shadow-sm border border-gray-200">
+    <article className="bg-surface-container-lowest rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col gap-4">
       {/* ── Header ── */}
-      <div className="flex items-start gap-3 p-4 sm:p-6 pb-0 sm:pb-0">
-        <Link to={`/profile/${creator.id}`} className="shrink-0">
-          <img
-            src={creator.profilePictureUrl || "/default-avatar.png"}
-            alt={creator.name}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100"
-          />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <Link
-            to={`/profile/${creator.id}`}
-            className="font-semibold text-gray-900 hover:text-blue-700 truncate block"
-          >
-            {creator.name}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to={`/profile/${creator.id}`} className="shrink-0">
+            <img
+              src={creator.profilePictureUrl || "/default-avatar.png"}
+              alt={creator.name}
+              className="w-11 h-11 rounded-full object-cover ring-2 ring-surface-container-high"
+            />
           </Link>
-          <p className="text-xs text-gray-500">
-            {timeAgo(post.createdAt)} · {rescueArea.name}
-          </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Link
+                to={`/profile/${creator.id}`}
+                className="font-display text-[17px] font-semibold text-on-surface hover:text-primary truncate"
+              >
+                {creator.name}
+              </Link>
+              {creator.role === "VOLUNTEER" && (
+                <Icon name="verified" filled className="text-[16px] text-secondary shrink-0" />
+              )}
+              {isOwnPost && (
+                <span className="shrink-0 px-1.5 rounded bg-surface-container-high text-on-surface-variant text-[11px] font-semibold">
+                  You
+                </span>
+              )}
+            </div>
+            <p className="flex items-center gap-2 text-[13px] text-on-surface-variant">
+              <span className="shrink-0">{timeAgo(post.createdAt)}</span>
+              <span>•</span>
+              <span className="flex items-center gap-0.5 min-w-0">
+                <Icon name="location_on" className="text-[14px]" />
+                <span className="truncate">{rescueArea.name}</span>
+              </span>
+            </p>
+          </div>
         </div>
         <span
-          className={`shrink-0 px-3 py-1 text-xs font-medium rounded-full ${status.className}`}
+          className={`shrink-0 flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-full ${status.className}`}
         >
+          {assignment.status === "OPEN" ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse" />
+          ) : (
+            <Icon name="check_circle" className="text-[14px]" />
+          )}
           {status.label}
         </span>
       </div>
 
       {/* ── Body ── */}
-      <div className="px-4 sm:px-6 py-4">
-        <h3 className="font-semibold text-gray-900">{post.title}</h3>
+      <div>
+        <h3 className="font-display text-xl font-semibold text-on-surface wrap-break-word">{post.title}</h3>
         <p
-          className={`mt-1 text-sm text-gray-700 whitespace-pre-wrap wrap-break-word ${
+          className={`mt-2 text-[15px] leading-relaxed text-on-surface-variant whitespace-pre-wrap wrap-break-word ${
             isLong && !expanded ? "line-clamp-4" : ""
           }`}
         >
@@ -161,7 +187,7 @@ export default function PostCard({ post, user }) {
         {isLong && (
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="mt-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="mt-1 text-sm font-semibold text-primary hover:text-primary-container"
           >
             {expanded ? "See less" : "See more"}
           </button>
@@ -169,44 +195,30 @@ export default function PostCard({ post, user }) {
       </div>
 
       {/* ── Volunteer ── */}
-      {(assignedVolunteer || canAssign) && (
-        <div className="mx-4 sm:mx-6 mb-4 flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50">
-          {assignedVolunteer ? (
-            <>
-              <img
-                src={assignedVolunteer.user.profilePictureUrl || "/default-avatar.png"}
-                alt={assignedVolunteer.user.name}
-                className="w-8 h-8 rounded-full object-cover shrink-0"
-              />
-              <p className="text-sm text-gray-700 min-w-0">
-                <Link
-                  to={`/volunteers/${assignedVolunteer.id}`}
-                  className="font-semibold text-gray-900 hover:text-blue-700"
-                >
-                  {assignedVolunteer.user.name}
-                </Link>{" "}
-                is handling this rescue
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="flex-1 text-sm text-gray-700">No volunteer has taken this rescue yet.</p>
-              <button
-                onClick={assignToMe}
-                disabled={assigning}
-                className="shrink-0 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {assigning ? "Assigning..." : "Take this rescue"}
-              </button>
-            </>
-          )}
+      {assignedVolunteer && (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-surface-container-low">
+          <img
+            src={assignedVolunteer.user.profilePictureUrl || "/default-avatar.png"}
+            alt={assignedVolunteer.user.name}
+            className="w-8 h-8 rounded-full object-cover ring-2 ring-secondary-container shrink-0"
+          />
+          <p className="text-sm text-on-surface-variant min-w-0">
+            <Link
+              to={`/volunteers/${assignedVolunteer.id}`}
+              className="font-semibold text-on-surface hover:text-secondary"
+            >
+              {assignedVolunteer.user.name}
+            </Link>{" "}
+            is handling this rescue
+          </p>
+          <Icon name="verified_user" className="ml-auto text-[18px] text-secondary shrink-0" />
         </div>
       )}
 
       {/* ── Images ── */}
       {shownImages.length > 0 && (
         <div
-          className={`grid gap-0.5 ${shownImages.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
+          className={`grid gap-1 rounded-xl overflow-hidden ${shownImages.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}
         >
           {shownImages.map((image, index) => (
             <button
@@ -214,7 +226,7 @@ export default function PostCard({ post, user }) {
               type="button"
               onClick={() => setLightboxIndex(index)}
               aria-label={`View image ${index + 1} of ${images.length}`}
-              className={`relative block bg-gray-100 overflow-hidden cursor-zoom-in hover:brightness-95 transition ${
+              className={`relative block bg-surface-container-high overflow-hidden cursor-zoom-in group ${
                 shownImages.length === 3 && index === 0 ? "col-span-2" : ""
               }`}
             >
@@ -222,8 +234,8 @@ export default function PostCard({ post, user }) {
                 src={image.imageUrl}
                 alt={post.title}
                 loading="lazy"
-                className={`w-full object-cover ${
-                  shownImages.length === 1 ? "max-h-[128]" : "h-56"
+                className={`w-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ${
+                  shownImages.length === 1 ? "max-h-128" : "h-56"
                 }`}
               />
               {hiddenCount > 0 && index === shownImages.length - 1 && (
@@ -246,18 +258,24 @@ export default function PostCard({ post, user }) {
 
       {/* ── Donation progress ── */}
       {post.donationTarget > 0 && (
-        <div className="px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-900">
-              ৳{post.donationReceived.toLocaleString()} raised
-            </span>
-            <span className="text-gray-500">
-              of ৳{post.donationTarget.toLocaleString()}
+        <div className="bg-surface-container-low p-4 rounded-xl flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-baseline gap-1 flex-wrap">
+              <span className={`font-display text-xl font-bold ${fullyFunded ? "text-secondary" : "text-primary"}`}>
+                ৳{post.donationReceived.toLocaleString()}
+              </span>
+              <span className="text-[13px] text-on-surface-variant">
+                raised of ৳{post.donationTarget.toLocaleString()} target
+              </span>
+            </p>
+            <span className="shrink-0 flex items-center gap-1 text-xs font-bold text-secondary">
+              {fullyFunded && <Icon name="verified" className="text-[16px]" />}
+              {progress}% Funded
             </span>
           </div>
-          <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-2 rounded-full bg-surface-container-highest overflow-hidden">
             <div
-              className="h-full rounded-full bg-green-500"
+              className={`h-full rounded-full transition-all duration-500 ${fullyFunded ? "bg-secondary" : "bg-primary"}`}
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -265,53 +283,90 @@ export default function PostCard({ post, user }) {
       )}
 
       {/* ── Actions ── */}
-      <div className="border-t border-gray-100 px-4 sm:px-6 py-2 flex items-center gap-1">
-        <button
-          onClick={toggleUpvote}
-          aria-pressed={upvoted}
-          className={`flex items-center gap-1.5 px-2 py-1 -ml-2 text-sm font-medium rounded-lg hover:bg-gray-50 ${
-            upvoted ? "text-blue-600" : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-4 h-4"
-            fill={upvoted ? "currentColor" : "none"}
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          >
-            <path d="M12 4l8 9h-5v7H9v-7H4z" />
-          </svg>
-          {upvoteCount > 0 ? upvoteCount : "Upvote"}
-        </button>
-
-        <button
-          onClick={() => setShowComments((v) => !v)}
-          className="px-2 py-1 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900"
-        >
-          {commentCount === 0
-            ? "Comment"
-            : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
-        </button>
-
-        {!isOwnPost && (
-          <button
-            onClick={openReport}
-            disabled={reported}
-            className="ml-auto px-2 py-1 text-sm font-medium text-gray-500 rounded-lg hover:bg-gray-50 hover:text-red-600 disabled:hover:bg-transparent disabled:hover:text-gray-500"
-          >
-            {reported ? "Reported" : "Report"}
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {(canAssign || canDonate) && (
+          <div className="flex items-center gap-2">
+            {canDonate && (
+              <Link
+                to={`/volunteers/${assignedVolunteer.id}`}
+                className="flex-1 sm:flex-none bg-primary hover:bg-primary-container text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2"
+              >
+                <Icon name="volunteer_activism" className="text-[18px]" />
+                Donate to {assignedVolunteer.user.name.split(" ")[0]}
+              </Link>
+            )}
+            {canAssign && (
+              <button
+                onClick={assignToMe}
+                disabled={assigning}
+                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Icon name="handshake" className="text-[18px]" />
+                {assigning ? "Claiming..." : "Claim Case as Volunteer"}
+              </button>
+            )}
+          </div>
         )}
+
+        <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant sm:ml-auto self-end sm:self-center">
+          <button
+            onClick={toggleUpvote}
+            aria-pressed={upvoted}
+            aria-label={upvoted ? "Remove upvote" : "Upvote"}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-container-low transition ${
+              upvoted ? "text-primary" : "hover:text-on-surface"
+            }`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-4.5 h-4.5"
+              fill={upvoted ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 4l8 9h-5v7H9v-7H4z" />
+            </svg>
+            {upvoteCount}
+          </button>
+
+          <button
+            onClick={() => setShowComments((v) => !v)}
+            aria-expanded={showComments}
+            aria-label="Comments"
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-container-low transition ${
+              showComments ? "text-on-surface" : "hover:text-on-surface"
+            }`}
+          >
+            <Icon name="mode_comment" filled={showComments} className="text-[18px]" />
+            {commentCount}
+          </button>
+
+          {!isOwnPost && (
+            <button
+              onClick={openReport}
+              disabled={reported}
+              aria-label={reported ? "Reported" : "Report post"}
+              title={reported ? "Reported" : "Report post"}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-container-low hover:text-error transition disabled:hover:bg-transparent disabled:hover:text-on-surface-variant"
+            >
+              <Icon name="flag" filled={reported} className="text-[18px]" />
+              {reported && "Reported"}
+            </button>
+          )}
+        </div>
       </div>
+
       {showComments && (
-        <CommentSection
-          postId={post.id}
-          user={user}
-          timeAgo={timeAgo}
-          onCountChange={(delta) => setCommentCount((n) => n + delta)}
-        />
+        <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
+          <CommentSection
+            postId={post.id}
+            user={user}
+            timeAgo={timeAgo}
+            onCountChange={(delta) => setCommentCount((n) => n + delta)}
+          />
+        </div>
       )}
       {showReport && (
         <ReportPostModal
