@@ -94,6 +94,8 @@ export async function volunteerById(req, res) {
           },
         },
         assignedPosts: {
+          // posts an admin took down are hidden from the public
+          where: { status: { not: "CANCELLED" } },
           select: {
             id: true,
             title: true,

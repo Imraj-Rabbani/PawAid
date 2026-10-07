@@ -133,6 +133,9 @@ export async function createPost(req, res){
     }
 }
 
+// posts an admin took down stay in the database but leave the public feed
+const HIDE_REMOVED = { status: { not: "CANCELLED" } };
+
 // Feed tabs on the homepage
 const POST_FILTERS = {
     open: { status: "OPEN", assignedVolunteerId: null },
@@ -144,7 +147,7 @@ export async function listPosts(req, res){
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
         const cursor = z.uuid().safeParse(req.query.cursor)
-        const where = Object.hasOwn(POST_FILTERS, req.query.filter) ? POST_FILTERS[req.query.filter] : {}
+        const where = Object.hasOwn(POST_FILTERS, req.query.filter) ? POST_FILTERS[req.query.filter] : HIDE_REMOVED
 
         // newest first, one extra row tells us whether there is another page
         const posts = await prisma.rescuePost.findMany({

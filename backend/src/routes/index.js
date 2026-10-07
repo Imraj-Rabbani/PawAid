@@ -7,7 +7,10 @@ import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
-import { getStats } from "../modules/admin/admin.controller.js";
+import {
+    deleteArea, getStats, listAdminAreas, listAdminPosts, listReports, listTransactions, listUsers,
+    listVolunteers, renameArea, updatePostStatus, updateReportStatus, updateUserStatus, updateVolunteerStatus,
+} from "../modules/admin/admin.controller.js";
 import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
 import { donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
@@ -43,7 +46,21 @@ router.post("/rescue-post/:postId/report", requireAuth, reportPost)
 router.post("/rescue-post/:postId/assign", requireAuth, requireActiveVolunteer, assignPost)
 
 
-router.get("/admin/stats", requireAuth, requireAdmin, getStats)
+// every /admin route below needs a signed in admin
+router.use("/admin", requireAuth, requireAdmin)
+router.get("/admin/stats", getStats)
+router.get("/admin/users", listUsers)
+router.patch("/admin/users/:userId/status", updateUserStatus)
+router.get("/admin/volunteers", listVolunteers)
+router.patch("/admin/volunteers/:volunteerId/status", updateVolunteerStatus)
+router.get("/admin/posts", listAdminPosts)
+router.patch("/admin/posts/:postId/status", updatePostStatus)
+router.get("/admin/reports", listReports)
+router.patch("/admin/reports/:reportId", updateReportStatus)
+router.get("/admin/areas", listAdminAreas)
+router.patch("/admin/areas/:areaId", renameArea)
+router.delete("/admin/areas/:areaId", deleteArea)
+router.get("/admin/transactions", listTransactions)
 
 
 router.get("/volunteer", volunteers)
