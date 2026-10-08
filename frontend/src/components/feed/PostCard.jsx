@@ -4,6 +4,8 @@ import api from "../../services/api";
 import CommentSection from "./CommentSection";
 import ReportPostModal from "./ReportPostModal";
 import DonatePostModal from "./DonatePostModal";
+import EditPostModal from "./EditPostModal";
+import ResolveRescueModal from "./ResolveRescueModal";
 import ImageLightbox from "./ImageLightbox";
 import Icon from "../Icon";
 
@@ -32,7 +34,7 @@ function timeAgo(date) {
   return new Date(date).toLocaleDateString();
 }
 
-export default function PostCard({ post, user }) {
+export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   // stable so the lightbox doesn't redo its setup on every render
@@ -53,6 +55,10 @@ export default function PostCard({ post, user }) {
   const [raised, setRaised] = useState(post.donationReceived);
   const [showDonate, setShowDonate] = useState(false);
   const [thanks, setThanks] = useState("");
+  const [showEdit, setShowEdit] = useState(false);
+  const [showResolve, setShowResolve] = useState(false);
+  const [progressing, setProgressing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   const { creator, rescueArea, images } = post;
@@ -71,6 +77,11 @@ export default function PostCard({ post, user }) {
   const isOwnPost = user?.id === creator.id;
   const fullyFunded = progress >= 100;
   const handlingIt = assignedVolunteer && assignedVolunteer.user.id === user?.id;
+  // the volunteer on the rescue moves it forward; the server re-checks they're still active
+  const canStart = handlingIt && assignment.status === "ASSIGNED";
+  const canResolve = handlingIt && ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status);
+  // creators can change their post until a volunteer takes it on
+  const canEdit = isOwnPost && assignment.status === "OPEN" && !assignedVolunteer;
   // fundraising rescues take donations on the post, before or after a volunteer takes them
   const canDonate =
     post.donationTarget > 0 && DONATABLE_STATUSES.includes(assignment.status) && !isOwnPost && !handlingIt;
@@ -123,6 +134,39 @@ export default function PostCard({ post, user }) {
       alert(err.response?.data?.message || "Failed to assign rescue");
     } finally {
       setAssigning(false);
+    }
+  };
+
+  // the server sends back the whole post after a change; keep this card and the feed in step
+  const applyUpdate = (updated) => {
+    setAssignment({ status: updated.status, assignedVolunteer: updated.assignedVolunteer });
+    onUpdated?.(updated);
+  };
+
+  const startRescue = async () => {
+    try {
+      setProgressing(true);
+      const res = await api.patch(`/rescue-post/${post.id}/progress`, { status: "IN_PROGRESS" });
+      applyUpdate(res.data.data);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to update rescue");
+    } finally {
+      setProgressing(false);
+    }
+  };
+
+  const deletePost = async () => {
+    if (!confirm("Delete this rescue post? This can't be undone.")) return;
+
+    try {
+      setDeleting(true);
+      await api.delete(`/rescue-post/${post.id}`);
+      onDeleted?.(post.id);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to delete post");
+      setDeleting(false);
     }
   };
 
@@ -241,6 +285,32 @@ export default function PostCard({ post, user }) {
         </div>
       )}
 
+      {/* ── Rescue update ── */}
+      {assignment.status === "RESOLVED" && (post.rescueNote || post.rescuePhotoUrl) && (
+        <div className="rounded-xl bg-secondary-container/40 p-3 flex flex-col gap-2">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-on-secondary-container">
+            <Icon name="celebration" className="text-[16px]" />
+            Rescue update
+            {post.resolvedAt && (
+              <span className="font-medium normal-case tracking-normal text-on-surface-variant">
+                · {timeAgo(post.resolvedAt)}
+              </span>
+            )}
+          </p>
+          {post.rescueNote && (
+            <p className="text-[15px] text-on-surface whitespace-pre-wrap wrap-break-word">{post.rescueNote}</p>
+          )}
+          {post.rescuePhotoUrl && (
+            <img
+              src={post.rescuePhotoUrl}
+              alt={`${post.title} after the rescue`}
+              loading="lazy"
+              className="w-full max-h-96 object-cover rounded-lg"
+            />
+          )}
+        </div>
+      )}
+
       {/* ── Images ── */}
       {shownImages.length > 0 && (
         <div
@@ -317,8 +387,28 @@ export default function PostCard({ post, user }) {
 
       {/* ── Actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {(canAssign || canDonate || canDonateToVolunteer) && (
-          <div className="flex items-center gap-2">
+        {(canAssign || canDonate || canDonateToVolunteer || canStart || canResolve) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {canStart && (
+              <button
+                onClick={startRescue}
+                disabled={progressing}
+                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Icon name="directions_run" className="text-[18px]" />
+                {progressing ? "Updating..." : "Start Rescue"}
+              </button>
+            )}
+            {canResolve && (
+              <button
+                onClick={() => setShowResolve(true)}
+                disabled={progressing}
+                className="flex-1 sm:flex-none bg-secondary hover:opacity-90 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Icon name="check_circle" className="text-[18px]" />
+                Mark Rescued
+              </button>
+            )}
             {canDonate && (
               <button
                 onClick={openDonate}
@@ -385,6 +475,28 @@ export default function PostCard({ post, user }) {
             {commentCount}
           </button>
 
+          {canEdit && (
+            <>
+              <button
+                onClick={() => setShowEdit(true)}
+                aria-label="Edit post"
+                title="Edit post"
+                className="flex items-center px-2 py-1 rounded-lg hover:bg-surface-container-low hover:text-on-surface transition"
+              >
+                <Icon name="edit" className="text-[18px]" />
+              </button>
+              <button
+                onClick={deletePost}
+                disabled={deleting}
+                aria-label="Delete post"
+                title="Delete post"
+                className="flex items-center px-2 py-1 rounded-lg hover:bg-surface-container-low hover:text-error transition disabled:opacity-50"
+              >
+                <Icon name="delete" className="text-[18px]" />
+              </button>
+            </>
+          )}
+
           {!isOwnPost && (
             <button
               onClick={openReport}
@@ -409,6 +521,27 @@ export default function PostCard({ post, user }) {
             onCountChange={(delta) => setCommentCount((n) => n + delta)}
           />
         </div>
+      )}
+      {showEdit && (
+        <EditPostModal
+          post={post}
+          raised={raised}
+          onClose={() => setShowEdit(false)}
+          onSaved={(updated) => {
+            setShowEdit(false);
+            applyUpdate(updated);
+          }}
+        />
+      )}
+      {showResolve && (
+        <ResolveRescueModal
+          post={post}
+          onClose={() => setShowResolve(false)}
+          onResolved={(updated) => {
+            setShowResolve(false);
+            applyUpdate(updated);
+          }}
+        />
       )}
       {showDonate && (
         <DonatePostModal

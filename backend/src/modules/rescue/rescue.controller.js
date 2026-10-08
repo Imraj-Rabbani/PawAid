@@ -314,3 +314,210 @@ export async function assignPost(req, res){
         res.status(500).json({ message: "Failed to assign rescue" });
     }
 }
+
+
+// Which statuses the assigned volunteer can move a rescue to, and from where
+const PROGRESS_FROM = {
+    IN_PROGRESS: ["ASSIGNED"],
+    RESOLVED: ["ASSIGNED", "IN_PROGRESS"],
+};
+
+const progressSchema = z.object({
+    status: z.enum(Object.keys(PROGRESS_FROM), "Status must be IN_PROGRESS or RESOLVED."),
+    note: z.string().trim().max(1000, "Update is too long.").optional(),
+});
+
+// The assigned volunteer moves their rescue forward: Assigned -> In Progress -> Rescued.
+// Marking it rescued can carry a closing note and photo.
+export async function updatePostProgress(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const parsed = progressSchema.safeParse(req.body ?? {})
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Validation failed",
+                errors: parsed.error.flatten().fieldErrors,
+            });
+        }
+
+        const { status, note } = parsed.data
+        const resolving = status === "RESOLVED"
+
+        if (!resolving && (note || req.file)) {
+            return res.status(400).json({ message: "A rescue update can only be added when marking it rescued" })
+        }
+
+        const post = await prisma.rescuePost.findUnique({
+            where: { id: postId.data },
+            select: { id: true, status: true, assignedVolunteerId: true },
+        })
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+        if (post.assignedVolunteerId !== req.volunteer.id) {
+            return res.status(403).json({ message: "Only the volunteer handling this rescue can update it" })
+        }
+        if (!PROGRESS_FROM[status].includes(post.status)) {
+            return res.status(409).json({ message: "This rescue can't be moved to that status any more" })
+        }
+
+        // checked above first so a rejected request doesn't upload anything
+        const photoUrl = req.file
+            ? await uploadToR2(
+                req.file.buffer,
+                `rescue-updates/${post.id}-${Date.now()}.${req.file.mimetype.split("/")[1]}`,
+                req.file.mimetype
+            )
+            : undefined
+
+        // the status condition in the update stops two requests racing past the check above
+        const { count } = await prisma.rescuePost.updateMany({
+            where: { id: post.id, assignedVolunteerId: req.volunteer.id, status: { in: PROGRESS_FROM[status] } },
+            data: {
+                status,
+                ...(resolving && {
+                    resolvedAt: new Date(),
+                    rescueNote: note || null,
+                    rescuePhotoUrl: photoUrl ?? null,
+                }),
+            },
+        })
+        if (count === 0) {
+            return res.status(409).json({ message: "This rescue can't be moved to that status any more" })
+        }
+
+        const updated = await prisma.rescuePost.findUnique({
+            where: { id: post.id },
+            include: postIncludeFor(req.user.id),
+        })
+
+        return res.json({
+            message: resolving ? "Rescue marked as rescued" : "Rescue marked in progress",
+            data: withUpvoted(updated)
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to update rescue" });
+    }
+}
+
+// A creator can change or remove their post only while nobody has taken it on
+const EDITABLE = { status: "OPEN", assignedVolunteerId: null };
+
+async function explainNotEditable(postId, userId) {
+    const post = await prisma.rescuePost.findUnique({
+        where: { id: postId },
+        select: { creatorId: true },
+    })
+    if (!post) return [404, "Post not found"]
+    if (post.creatorId !== userId) return [403, "You can only change your own posts"]
+    return [409, "This rescue has been taken on by a volunteer and can no longer be changed"]
+}
+
+export async function updatePost(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const parsed = postSchema.safeParse(req.body ?? {})
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Validation failed",
+                errors: parsed.error.flatten().fieldErrors,
+            });
+        }
+
+        const { title, description, rescueAreaId, donationTarget = 0 } = parsed.data
+
+        const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } })
+        if (!area) {
+            return res.status(400).json({ message: "Invalid rescue area" })
+        }
+
+        const { count } = await prisma.rescuePost.updateMany({
+            // the target can't drop below what has already been raised
+            where: { id: postId.data, creatorId: req.user.id, ...EDITABLE, donationReceived: { lte: donationTarget } },
+            data: { title, description, rescueAreaId, donationTarget },
+        })
+
+        if (count === 0) {
+            const [code, message] = await explainNotEditable(postId.data, req.user.id)
+            if (code === 409) {
+                const post = await prisma.rescuePost.findUnique({
+                    where: { id: postId.data },
+                    select: { donationReceived: true, status: true },
+                })
+                if (post?.status === "OPEN" && post.donationReceived > donationTarget) {
+                    return res.status(400).json({
+                        message: "Validation failed",
+                        errors: { donationTarget: [`This rescue has already raised ৳${post.donationReceived.toLocaleString()}; the target can't be lower.`] },
+                    })
+                }
+            }
+            return res.status(code).json({ message })
+        }
+
+        const post = await prisma.rescuePost.findUnique({
+            where: { id: postId.data },
+            include: postIncludeFor(req.user.id),
+        })
+
+        return res.json({
+            message: "Post updated",
+            data: withUpvoted(post)
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to update post" });
+    }
+}
+
+// Deleting is only for posts that never received money; once a donation exists the
+// post must stay for the financial record (PRD §26)
+export async function deletePost(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const { count } = await prisma.rescuePost.deleteMany({
+            where: {
+                id: postId.data,
+                creatorId: req.user.id,
+                ...EDITABLE,
+                donationReceived: 0,
+                donations: { none: {} },
+            },
+        })
+
+        if (count === 0) {
+            const [code, message] = await explainNotEditable(postId.data, req.user.id)
+            if (code === 409) {
+                const post = await prisma.rescuePost.findUnique({
+                    where: { id: postId.data },
+                    select: { status: true },
+                })
+                if (post?.status === "OPEN") {
+                    return res.status(409).json({ message: "This rescue has received donations and can't be deleted" })
+                }
+            }
+            return res.status(code).json({ message })
+        }
+
+        return res.json({ message: "Post deleted" })
+    } catch (error) {
+        // a donation landed between the check and the delete
+        if (error.code === "P2003") {
+            return res.status(409).json({ message: "This rescue has received donations and can't be deleted" })
+        }
+        console.error(error);
+        res.status(500).json({ message: "Failed to delete post" });
+    }
+}

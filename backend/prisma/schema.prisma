@@ -179,6 +179,10 @@ model RescuePost {
   donationTarget Int @default(0) @map("donation_target")
   donationReceived Int @default(0) @map("donation_received")
   status RescuePostStatus @default(OPEN)
+  // the assigned volunteer's closing update when they mark the rescue RESOLVED
+  rescueNote String? @map("rescue_note")
+  rescuePhotoUrl String? @map("rescue_photo_url")
+  resolvedAt DateTime? @map("resolved_at")
   createdAt DateTime @default(now()) @map("created_at")
   creator User @relation("PostCreator", fields: [creatorId], references: [id])
   rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])

@@ -96,6 +96,17 @@ export default function Homepage() {
     );
   };
 
+  const handleUpdated = (updated) => {
+    setPosts((prev) => prev.map((post) => (post.id === updated.id ? updated : post)));
+  };
+
+  const handleDeleted = (postId) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+    setSummary((prev) =>
+      prev?.me ? { ...prev, me: { ...prev.me, postCount: Math.max(prev.me.postCount - 1, 0) } } : prev
+    );
+  };
+
   return (
     <div className="min-h-screen bg-surface text-on-surface">
       <Navbar />
@@ -152,7 +163,13 @@ export default function Homepage() {
             ) : (
               <>
                 {posts.map((post) => (
-                  <PostCard key={post.id} post={post} user={user} />
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    user={user}
+                    onUpdated={handleUpdated}
+                    onDeleted={handleDeleted}
+                  />
                 ))}
 
                 {nextCursor && (
