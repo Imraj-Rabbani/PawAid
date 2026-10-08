@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import CommentSection from "./CommentSection";
 import ReportPostModal from "./ReportPostModal";
+import DonatePostModal from "./DonatePostModal";
 import ImageLightbox from "./ImageLightbox";
 import Icon from "../Icon";
 
@@ -14,6 +15,9 @@ const STATUS = {
   CLOSED: { label: "Closed", className: "bg-surface-container-high text-on-surface-variant" },
   CANCELLED: { label: "Cancelled", className: "bg-surface-container-high text-on-surface-variant" },
 };
+
+// keep in sync with DONATABLE_STATUSES in backend/src/modules/donation/donation.controller.js
+const DONATABLE_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS"];
 
 const MAX_IMAGES_SHOWN = 4;
 const LONG_DESCRIPTION = 280;
@@ -46,6 +50,9 @@ export default function PostCard({ post, user }) {
   const [upvoting, setUpvoting] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reported, setReported] = useState(false);
+  const [raised, setRaised] = useState(post.donationReceived);
+  const [showDonate, setShowDonate] = useState(false);
+  const [thanks, setThanks] = useState("");
   const navigate = useNavigate();
 
   const { creator, rescueArea, images } = post;
@@ -58,13 +65,17 @@ export default function PostCard({ post, user }) {
   const shownImages = images.slice(0, MAX_IMAGES_SHOWN);
   const hiddenCount = images.length - shownImages.length;
   const progress = post.donationTarget
-    ? Math.min(100, Math.round((post.donationReceived / post.donationTarget) * 100))
+    ? Math.min(100, Math.round((raised / post.donationTarget) * 100))
     : 0;
 
   const isOwnPost = user?.id === creator.id;
   const fullyFunded = progress >= 100;
-  // donations reach a rescue through the volunteer handling it
-  const canDonate = assignedVolunteer && assignedVolunteer.user.id !== user?.id;
+  const handlingIt = assignedVolunteer && assignedVolunteer.user.id === user?.id;
+  // fundraising rescues take donations on the post, before or after a volunteer takes them
+  const canDonate =
+    post.donationTarget > 0 && DONATABLE_STATUSES.includes(assignment.status) && !isOwnPost && !handlingIt;
+  // a rescue without a target can still be supported through its volunteer
+  const canDonateToVolunteer = !canDonate && assignedVolunteer && !handlingIt && !post.donationTarget;
 
   const toggleUpvote = async () => {
     if (!user) {
@@ -113,6 +124,21 @@ export default function PostCard({ post, user }) {
     } finally {
       setAssigning(false);
     }
+  };
+
+  const openDonate = () => {
+    if (!user) {
+      navigate("/signin");
+      return;
+    }
+    setThanks("");
+    setShowDonate(true);
+  };
+
+  const handleDonated = ({ donation, post: updated }) => {
+    setRaised(updated.donationReceived);
+    setShowDonate(false);
+    setThanks(`Thank you! You donated ৳${donation.amount.toLocaleString()} to this rescue.`);
   };
 
   const openReport = () => {
@@ -262,7 +288,7 @@ export default function PostCard({ post, user }) {
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-baseline gap-1 flex-wrap">
               <span className={`font-display text-xl font-bold ${fullyFunded ? "text-secondary" : "text-primary"}`}>
-                ৳{post.donationReceived.toLocaleString()}
+                ৳{raised.toLocaleString()}
               </span>
               <span className="text-[13px] text-on-surface-variant">
                 raised of ৳{post.donationTarget.toLocaleString()} target
@@ -282,11 +308,27 @@ export default function PostCard({ post, user }) {
         </div>
       )}
 
+      {thanks && (
+        <p className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary-container text-on-secondary-container text-sm font-semibold">
+          <Icon name="favorite" filled className="text-[18px]" />
+          {thanks}
+        </p>
+      )}
+
       {/* ── Actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {(canAssign || canDonate) && (
+        {(canAssign || canDonate || canDonateToVolunteer) && (
           <div className="flex items-center gap-2">
             {canDonate && (
+              <button
+                onClick={openDonate}
+                className="flex-1 sm:flex-none bg-primary hover:bg-primary-container text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2"
+              >
+                <Icon name="volunteer_activism" className="text-[18px]" />
+                Donate
+              </button>
+            )}
+            {canDonateToVolunteer && (
               <Link
                 to={`/volunteers/${assignedVolunteer.id}`}
                 className="flex-1 sm:flex-none bg-primary hover:bg-primary-container text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2"
@@ -367,6 +409,15 @@ export default function PostCard({ post, user }) {
             onCountChange={(delta) => setCommentCount((n) => n + delta)}
           />
         </div>
+      )}
+      {showDonate && (
+        <DonatePostModal
+          post={{ ...post, assignedVolunteer }}
+          user={user}
+          raised={raised}
+          onClose={() => setShowDonate(false)}
+          onDonated={handleDonated}
+        />
       )}
       {showReport && (
         <ReportPostModal

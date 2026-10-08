@@ -58,7 +58,7 @@ export default function DonationsPage() {
 }
 
 function DonationRow({ donation }) {
-  const { amount, createdAt, donor, volunteer, rescuePost } = donation;
+  const { amount, createdAt, donor, volunteer, rescuePost, destinationType } = donation;
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4">
@@ -73,10 +73,12 @@ function DonationRow({ donation }) {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5-5 5M6 12h12" />
         </svg>
-        {volunteer ? (
+        {destinationType === "RESCUE_POST" ? (
+          <Party label="To rescue" name={rescuePost?.title || "Rescue post"} />
+        ) : volunteer ? (
           <Party label="To" user={volunteer.user} to={`/volunteers/${volunteer.id}`} />
         ) : (
-          <Party label="To rescue" name={rescuePost?.title || "Rescue post"} />
+          <Party label="To" name="Volunteer" />
         )}
       </div>
 

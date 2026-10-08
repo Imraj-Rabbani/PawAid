@@ -12,7 +12,7 @@ import {
     listVolunteers, renameArea, updatePostStatus, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
 import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
-import { donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
+import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
 import { homeSummary } from "../modules/home/home.controller.js";
 import { reportPost } from "../modules/report/report.controller.js";
@@ -78,5 +78,6 @@ router.post("/wallet/top-up", requireAuth, topUpWallet)
 router.get("/donations", listDonations)
 router.get("/donations/me", requireAuth, myDonations)
 router.post("/donations/volunteer/:volunteerId", requireAuth, donateToVolunteer)
+router.post("/donations/rescue-post/:postId", requireAuth, donateToPost)
 
 export default router
