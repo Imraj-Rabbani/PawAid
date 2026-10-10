@@ -15,6 +15,7 @@ import { myWallet, myWalletTransactions, topUpWallet, transferToVolunteer } from
 import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
 import { homeSummary } from "../modules/home/home.controller.js";
+import { transparencyOverview } from "../modules/transparency/transparency.controller.js";
 import { reportPost } from "../modules/report/report.controller.js";
 
 const router = Router()
@@ -29,6 +30,7 @@ router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"
 
 
 router.get("/home/summary", optionalAuth, homeSummary)
+router.get("/transparency", transparencyOverview)
 
 
 router.get("/area", listAreas)
