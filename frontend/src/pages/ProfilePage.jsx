@@ -4,11 +4,12 @@ import api, { updateStoredUser } from "../services/api";
 import Sidebar from "../components/profile/Sidebar";
 import ProfileTab from "../components/profile/ProfileTab";
 import DonationsTab from "../components/profile/DonationsTab";
+import WalletTab from "../components/profile/WalletTab";
 import EmptyTab from "../components/profile/EmptyTab";
 import Navbar from "../components/Navbar";
 
 
-const TABS = ["Profile", "Donations", "Rescues", "Address", "Orders"];
+const TABS = ["Profile", "Wallet", "Donations", "Rescues", "Address", "Orders"];
 
 export default function ProfilePage() {
   const { userId } = useParams();
@@ -105,6 +106,9 @@ export default function ProfilePage() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 min-h-125">
                 {activeTab === "Profile" && (
                   <ProfileTab key={user.id} user={user} setUser={setUser} isOwnProfile={isOwnProfile} />
+                )}
+                {activeTab === "Wallet" && (
+                  <WalletTab user={user} onWalletUpdated={(wallet) => setUser((prev) => ({ ...prev, wallet }))} />
                 )}
                 {activeTab === "Donations" && <DonationsTab isVolunteer={!!user.volunteerProfile} />}
                 {activeTab === "Rescues" && <EmptyTab title="Rescues" />}

@@ -11,7 +11,7 @@ import {
     deleteArea, getStats, listAdminAreas, listAdminPosts, listReports, listTransactions, listUsers,
     listVolunteers, renameArea, updatePostStatus, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
-import { myWallet, topUpWallet } from "../modules/wallet/wallet.controller.js";
+import { myWallet, myWalletTransactions, topUpWallet, transferToVolunteer } from "../modules/wallet/wallet.controller.js";
 import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
 import { homeSummary } from "../modules/home/home.controller.js";
@@ -76,6 +76,8 @@ router.get("/volunteer/:id", volunteerById)
 
 router.get("/wallet/me", requireAuth, myWallet)
 router.post("/wallet/top-up", requireAuth, topUpWallet)
+router.get("/wallet/transactions", requireAuth, myWalletTransactions)
+router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, transferToVolunteer)
 
 
 router.get("/donations", listDonations)
