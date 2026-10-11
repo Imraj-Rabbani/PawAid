@@ -8,8 +8,9 @@ import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import {
-    deleteArea, getStats, listAdminAreas, listAdminPosts, listReports, listTransactions, listUsers,
-    listVolunteers, renameArea, updatePostStatus, updateReportStatus, updateUserStatus, updateVolunteerStatus,
+    createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts,
+    listCategories, listReports, listTransactions, listUsers, listVolunteers, renameArea, updatePostStatus,
+    updateProduct, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
 import { myWallet, myWalletTransactions, topUpWallet, transferToVolunteer } from "../modules/wallet/wallet.controller.js";
 import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
@@ -66,6 +67,11 @@ router.get("/admin/areas", listAdminAreas)
 router.patch("/admin/areas/:areaId", renameArea)
 router.delete("/admin/areas/:areaId", deleteArea)
 router.get("/admin/transactions", listTransactions)
+router.get("/admin/categories", listCategories)
+router.post("/admin/categories", createCategory)
+router.get("/admin/products", listAdminProducts)
+router.post("/admin/products", upload.single("image"), createProduct)
+router.patch("/admin/products/:productId", upload.single("image"), updateProduct)
 
 
 router.get("/volunteer", volunteers)

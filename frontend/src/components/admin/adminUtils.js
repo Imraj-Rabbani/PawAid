@@ -57,6 +57,12 @@ export const TRANSACTION_TYPE = {
   REFUND: { label: "Refund", tone: "neutral" },
 };
 
+// keyed by the ?status= filter the products endpoint takes
+export const PRODUCT_STATUS = {
+  active: { label: "Active", tone: "success" },
+  inactive: { label: "Inactive", tone: "neutral" },
+};
+
 // value -> { label } map as <select> options, with an "All" entry first
 export const optionsFrom = (map, allLabel) => [
   { value: "", label: allLabel },

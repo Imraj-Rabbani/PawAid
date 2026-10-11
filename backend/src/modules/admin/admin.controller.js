@@ -1,5 +1,6 @@
 import z from "zod";
 import { prisma } from "../../db.js"
+import { uploadToR2 } from "../../services/upload.services.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -629,6 +630,239 @@ export async function deleteArea(req, res) {
         }
         console.error(error);
         res.status(500).json({ message: "Failed to delete area" });
+    }
+}
+
+
+// ========================================
+// MARKETPLACE CATEGORIES
+// ========================================
+
+const categorySchema = z.object({
+    name: z.string("Category name is required.").trim().min(2, "Category name is too short.").max(60, "Category name is too long."),
+})
+
+const adminCategorySelect = {
+    id: true,
+    name: true,
+    _count: { select: { products: true } },
+}
+
+export async function listCategories(req, res) {
+    try {
+        const categories = await prisma.productCategory.findMany({
+            select: adminCategorySelect,
+            orderBy: { name: "asc" },
+        })
+
+        return res.json({ message: "Categories listed", data: categories })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch categories" });
+    }
+}
+
+export async function createCategory(req, res) {
+    try {
+        const parsed = categorySchema.safeParse(req.body ?? {})
+        if (!parsed.success) return validationError(res, parsed)
+
+        const category = await prisma.productCategory.create({
+            data: { name: parsed.data.name },
+            select: adminCategorySelect,
+        })
+
+        return res.status(201).json({ message: "Category added", data: category })
+    } catch (error) {
+        if (error.code === "P2002") {
+            return res.status(409).json({ message: "Category already exists" })
+        }
+        console.error(error);
+        res.status(500).json({ message: "Failed to add category" });
+    }
+}
+
+
+// ========================================
+// MARKETPLACE PRODUCTS (PRD §14, §16, §28)
+// ========================================
+
+// products arrive as multipart form data, so numbers and booleans come in as strings
+// (a blank field is treated as missing rather than coerced to 0)
+const taka = (label, min, minMessage) => z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.number(`${label} must be a number.`).int(`${label} must be a whole number.`).min(min, minMessage),
+)
+const boolField = z.union([z.boolean(), z.stringbool()], "Active must be true or false.")
+
+const productFields = {
+    name: z.string("Product name is required.").trim().min(2, "Product name is too short.").max(120, "Product name is too long."),
+    // "" clears the description
+    description: z.string().trim().max(2000, "Description is too long.").transform((d) => d || null),
+    categoryId: z.uuid("Choose a category."),
+    costPrice: taka("Cost price", 0, "Cost price can't be negative."),
+    sellingPrice: taka("Selling price", 1, "Selling price must be at least ৳1."),
+    stockQty: taka("Stock", 0, "Stock can't be negative."),
+    active: boolField,
+}
+
+const createProductSchema = z.object({
+    ...productFields,
+    description: productFields.description.optional(),
+    stockQty: productFields.stockQty.default(0),
+    active: boolField.default(true),
+})
+
+const updateProductSchema = z.object(productFields).partial()
+
+const PRODUCT_STATUSES = { active: true, inactive: false }
+
+const adminProductSelect = {
+    id: true,
+    name: true,
+    description: true,
+    imageUrl: true,
+    costPrice: true,
+    sellingPrice: true,
+    stockQty: true,
+    active: true,
+    createdAt: true,
+    category: { select: { id: true, name: true } },
+    _count: { select: { orderItems: true } },
+}
+
+// marketplace profit funds rescues (PRD §16), so a product may never sell at a loss
+function priceError(costPrice, sellingPrice) {
+    return sellingPrice < costPrice ? "Selling price can't be lower than the cost price." : null
+}
+
+async function categoryExists(categoryId) {
+    const category = await prisma.productCategory.findUnique({ where: { id: categoryId }, select: { id: true } })
+    return Boolean(category)
+}
+
+function uploadProductImage(file) {
+    const key = `products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${file.mimetype.split("/")[1]}`
+    return uploadToR2(file.buffer, key, file.mimetype)
+}
+
+export async function listAdminProducts(req, res) {
+    try {
+        const paging = pageParams(req.query)
+        const search = searchTerm(req.query)
+        const categoryId = z.uuid().safeParse(req.query.categoryId)
+
+        const where = {
+            active: PRODUCT_STATUSES[req.query.status],
+            ...(categoryId.success && { categoryId: categoryId.data }),
+            ...(search && {
+                OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { description: { contains: search, mode: "insensitive" } },
+                ],
+            }),
+        }
+
+        const [products, total] = await Promise.all([
+            prisma.product.findMany({
+                where,
+                select: adminProductSelect,
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                skip: paging.skip,
+                take: paging.limit,
+            }),
+            prisma.product.count({ where }),
+        ])
+
+        return res.json({
+            message: "Products listed",
+            data: products,
+            pagination: pageInfo(paging, total),
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch products" });
+    }
+}
+
+export async function createProduct(req, res) {
+    try {
+        const parsed = createProductSchema.safeParse(req.body ?? {})
+        if (!parsed.success) return validationError(res, parsed)
+
+        const data = parsed.data
+
+        const badPrice = priceError(data.costPrice, data.sellingPrice)
+        if (badPrice) {
+            return res.status(400).json({ message: badPrice, errors: { sellingPrice: [badPrice] } })
+        }
+
+        if (!(await categoryExists(data.categoryId))) {
+            return res.status(400).json({ message: "Invalid category" })
+        }
+
+        // checked above first so a rejected request doesn't upload anything
+        const imageUrl = req.file ? await uploadProductImage(req.file) : null
+
+        const product = await prisma.product.create({
+            data: { ...data, imageUrl },
+            select: adminProductSelect,
+        })
+
+        return res.status(201).json({ message: "Product added", data: product })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to add product" });
+    }
+}
+
+// Edits any field, including active. Products are deactivated instead of deleted
+// because past orders point at them.
+export async function updateProduct(req, res) {
+    try {
+        const productId = z.uuid().safeParse(req.params.productId)
+        if (!productId.success) {
+            return res.status(404).json({ message: "Product not found" })
+        }
+
+        const parsed = updateProductSchema.safeParse(req.body ?? {})
+        if (!parsed.success) return validationError(res, parsed)
+
+        const data = parsed.data
+
+        const product = await prisma.product.findUnique({
+            where: { id: productId.data },
+            select: { id: true, costPrice: true, sellingPrice: true },
+        })
+        if (!product) {
+            return res.status(404).json({ message: "Product not found" })
+        }
+
+        const badPrice = priceError(data.costPrice ?? product.costPrice, data.sellingPrice ?? product.sellingPrice)
+        if (badPrice) {
+            return res.status(400).json({ message: badPrice, errors: { sellingPrice: [badPrice] } })
+        }
+
+        if (data.categoryId && !(await categoryExists(data.categoryId))) {
+            return res.status(400).json({ message: "Invalid category" })
+        }
+
+        const imageUrl = req.file ? await uploadProductImage(req.file) : undefined
+
+        const updated = await prisma.product.update({
+            where: { id: product.id },
+            data: { ...data, imageUrl },
+            select: adminProductSelect,
+        })
+
+        const message = Object.keys(data).length === 1 && data.active !== undefined
+            ? (data.active ? "Product activated" : "Product deactivated")
+            : "Product updated"
+
+        return res.json({ message, data: updated })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to update product" });
     }
 }
 

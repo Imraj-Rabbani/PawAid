@@ -9,6 +9,7 @@ import PostsTab from "../components/admin/PostsTab";
 import UsersTab from "../components/admin/UsersTab";
 import VolunteersTab from "../components/admin/VolunteersTab";
 import AreasTab from "../components/admin/AreasTab";
+import ProductsTab from "../components/admin/ProductsTab";
 import TransactionsTab from "../components/admin/TransactionsTab";
 import { errorMessage } from "../components/admin/adminUtils";
 
@@ -19,6 +20,7 @@ const TABS = [
   { value: "users", label: "Users", icon: "group" },
   { value: "volunteers", label: "Volunteers", icon: "volunteer_activism" },
   { value: "areas", label: "Areas", icon: "location_on" },
+  { value: "products", label: "Products", icon: "storefront" },
   { value: "transactions", label: "Transactions", icon: "receipt_long" },
 ];
 
@@ -139,6 +141,7 @@ export default function AdminPage() {
               {tab === "users" && <UsersTab currentUserId={user.id} onChange={refresh} />}
               {tab === "volunteers" && <VolunteersTab areas={areas} onChange={refresh} />}
               {tab === "areas" && <AreasTab onChange={refresh} />}
+              {tab === "products" && <ProductsTab />}
               {tab === "transactions" && <TransactionsTab />}
             </>
           )}
