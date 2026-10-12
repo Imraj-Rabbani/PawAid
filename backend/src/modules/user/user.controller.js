@@ -61,24 +61,30 @@ export async function updateProfile(req, res){
   try {
     const userId = req.user.id
 
-    const {phone} = req.body
+    const phone = typeof req.body.phone === "string" ? req.body.phone.trim() : undefined
+    const address = typeof req.body.address === "string" ? req.body.address.trim() : undefined
     const name = typeof req.body.name === "string" ? req.body.name.trim() : undefined
 
     if (name !== undefined && name.length < 3) {
       return res.status(400).json({ message: "Name must be at least 3 characters long." })
+    }
+    if (address !== undefined && address.length > 500) {
+      return res.status(400).json({ message: "Address must be 500 characters or fewer." })
     }
 
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(name && { name }),
-        ...(phone !== undefined && { phone }),
+        ...(phone !== undefined && { phone: phone || null }),
+        ...(address !== undefined && { address: address || null }),
       },
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
+        address: true,
         role: true,
         profilePictureUrl: true,
         wallet: true,
