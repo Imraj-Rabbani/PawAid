@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import Icon from "../Icon";
 import { taka } from "./marketplaceUtils";
+import BuyButtons from "./BuyButtons";
 
 // stock under this shows an "only N left" nudge
 const LOW_STOCK = 5;
@@ -39,26 +40,27 @@ export function ProductImage({ product, className = "" }) {
 
 export default function ProductCard({ product }) {
   const soldOut = product.stockQty <= 0;
+  const href = `/marketplace/${product.id}`;
 
+  // the image and name link to the product; the buttons can't sit inside a link
   return (
-    <Link
-      to={`/marketplace/${product.id}`}
-      className="group flex flex-col bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      <div className="relative aspect-square overflow-hidden bg-surface-container-low">
+    <div className="group flex flex-col bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+      <Link to={href} tabIndex={-1} aria-hidden="true" className="relative block aspect-square overflow-hidden bg-surface-container-low">
         <ProductImage
           product={product}
           className={`w-full h-full transition-transform duration-300 group-hover:scale-105 ${soldOut ? "opacity-60 grayscale" : ""}`}
         />
         <StockBadge stockQty={product.stockQty} className="absolute top-3 left-3 shadow-sm" />
-      </div>
+      </Link>
 
       <div className="flex flex-col flex-1 p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
           {product.category.name}
         </p>
-        <h3 className="mt-1 font-display font-semibold text-on-surface line-clamp-2 group-hover:text-primary transition-colors">
-          {product.name}
+        <h3 className="mt-1 font-display font-semibold text-on-surface line-clamp-2">
+          <Link to={href} className="hover:text-primary transition-colors focus:outline-none focus-visible:underline">
+            {product.name}
+          </Link>
         </h3>
 
         <div className="mt-auto pt-3 flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
@@ -70,7 +72,11 @@ export default function ProductCard({ product }) {
             </p>
           )}
         </div>
+
+        <div className="mt-3">
+          <BuyButtons product={product} />
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }

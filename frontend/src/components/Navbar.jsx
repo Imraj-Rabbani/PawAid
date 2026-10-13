@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import Icon from "./Icon";
+import { useCart } from "../context/cartContext";
 
 const ROLE_LABELS = { USER: "Member", VOLUNTEER: "Volunteer", ADMIN: "Admin" };
 
@@ -10,6 +11,7 @@ export default function Navbar({ user: userProp }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [balance, setBalance] = useState(null);
+  const { count: cartCount } = useCart();
 
   const user =
     userProp || JSON.parse(localStorage.getItem("user") || "null");
@@ -92,6 +94,23 @@ export default function Navbar({ user: userProp }) {
 
           {/* ── Right side: user / auth ── */}
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => navigate("/cart")}
+              aria-label={`Cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
+              title="Cart"
+              className={`relative p-2 rounded-full transition ${location.pathname === "/cart"
+                  ? "bg-primary-fixed text-primary"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
+                }`}
+            >
+              <Icon name="shopping_cart" className="text-[22px]" />
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold leading-none">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </button>
+
             {user ? (
               <>
                 {balance !== null && (

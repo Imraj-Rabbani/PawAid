@@ -5,6 +5,9 @@ import Navbar from "../components/Navbar";
 import Icon from "../components/Icon";
 import ProductCard, { ProductImage, StockBadge } from "../components/marketplace/ProductCard";
 import { taka } from "../components/marketplace/marketplaceUtils";
+import BuyButtons from "../components/marketplace/BuyButtons";
+import QuantityStepper from "../components/marketplace/QuantityStepper";
+import { useCart, maxQuantity } from "../context/cartContext";
 
 export default function ProductPage() {
   const { productId } = useParams();
@@ -64,7 +67,7 @@ export default function ProductPage() {
           </div>
         ) : (
           <>
-            <ProductDetails product={product} />
+            <ProductDetails key={product.id} product={product} />
 
             {product.related.length > 0 && (
               <section className="mt-12">
@@ -86,6 +89,11 @@ export default function ProductPage() {
 }
 
 function ProductDetails({ product }) {
+  const { quantityOf } = useCart();
+  const [quantity, setQuantity] = useState(1);
+  const inCart = quantityOf(product.id);
+  const limit = maxQuantity(product);
+
   return (
     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10 bg-surface-container-lowest rounded-2xl shadow-sm p-4 md:p-6">
       <div className="aspect-square rounded-xl overflow-hidden bg-surface-container-low">
@@ -123,19 +131,33 @@ function ProductDetails({ product }) {
           </div>
         )}
 
+        <div className="mt-6">
+          {limit > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <QuantityStepper value={quantity} max={limit} onChange={setQuantity} />
+              <span className="text-sm text-on-surface-variant">
+                {product.stockQty} {product.stockQty === 1 ? "unit" : "units"} available
+              </span>
+            </div>
+          )}
+          <BuyButtons product={product} quantity={quantity} size="lg" />
+          {inCart > 0 && (
+            <p className="mt-3 flex items-center gap-1.5 text-sm text-on-surface-variant">
+              <Icon name="shopping_cart" className="text-[18px]" />
+              {inCart} in your cart ·{" "}
+              <Link to="/cart" className="font-semibold text-primary hover:underline">
+                View cart
+              </Link>
+            </p>
+          )}
+        </div>
+
         <div className="mt-6 pt-6 border-t border-surface-container-high">
           <h2 className="text-sm font-semibold text-on-surface">About this product</h2>
           <p className="mt-2 text-sm leading-6 text-on-surface-variant whitespace-pre-line">
             {product.description || "No description provided."}
           </p>
         </div>
-
-        {product.stockQty > 0 && (
-          <p className="mt-auto pt-6 flex items-center gap-2 text-sm text-on-surface-variant">
-            <Icon name="inventory_2" className="text-[18px]" />
-            {product.stockQty} {product.stockQty === 1 ? "unit" : "units"} available
-          </p>
-        )}
       </div>
     </div>
   );

@@ -39,9 +39,14 @@ export async function listProducts(req, res) {
         const paging = pageParams(req.query)
         const search = typeof req.query.search === "string" ? req.query.search.trim() : ""
         const categoryId = z.uuid().safeParse(req.query.categoryId)
+        // ?ids=a,b,c fetches specific products, used to refresh a saved cart
+        const ids = typeof req.query.ids === "string"
+            ? req.query.ids.split(",").filter((id) => z.uuid().safeParse(id).success).slice(0, 48)
+            : null
 
         const where = {
             active: true,
+            ...(ids && { id: { in: ids } }),
             ...(categoryId.success && { categoryId: categoryId.data }),
             ...(req.query.inStock === "true" && { stockQty: { gt: 0 } }),
             ...(search && {
