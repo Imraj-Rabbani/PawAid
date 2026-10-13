@@ -1,16 +1,12 @@
 import { useState } from "react";
-import api, { updateStoredUser } from "../../services/api";
+import api from "../../services/api";
 
 export default function AddressTab({ user, setUser }) {
   const [editing, setEditing] = useState(!user.address);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState({
-    name: user.name || "",
-    phone: user.phone || "",
-    address: user.address || "",
-  });
+  const [address, setAddress] = useState(user.address || "");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -19,10 +15,10 @@ export default function AddressTab({ user, setUser }) {
     setSaving(true);
 
     try {
-      const res = await api.put("/profile/update", form);
+      // Only the address is sent, so name and phone stay as set on the Profile tab
+      const res = await api.put("/profile/update", { address });
       setUser((previous) => ({ ...previous, ...res.data }));
-      updateStoredUser({ name: res.data.name, phone: res.data.phone, address: res.data.address });
-      setForm({ name: res.data.name || "", phone: res.data.phone || "", address: res.data.address || "" });
+      setAddress(res.data.address || "");
       setEditing(false);
       setSaved(true);
     } catch (requestError) {
@@ -33,7 +29,7 @@ export default function AddressTab({ user, setUser }) {
   };
 
   const handleCancel = () => {
-    setForm({ name: user.name || "", phone: user.phone || "", address: user.address || "" });
+    setAddress(user.address || "");
     setError("");
     setSaved(false);
     setEditing(false);
@@ -65,30 +61,11 @@ export default function AddressTab({ user, setUser }) {
 
       {editing ? (
         <form onSubmit={handleSubmit} className="mt-6 max-w-2xl space-y-5">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">Recipient name</span>
-            <input
-              required
-              minLength={3}
-              maxLength={100}
-              autoComplete="name"
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-gray-700">Phone number</span>
-            <input
-              required
-              type="tel"
-              autoComplete="tel"
-              value={form.phone}
-              onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </label>
+          <div className="rounded-lg bg-gray-50 px-4 py-3 text-sm">
+            <p className="font-medium text-gray-900">{user.name}</p>
+            <p className="mt-0.5 text-gray-600">{user.phone || "No phone number"}</p>
+            <p className="mt-2 text-xs text-gray-500">Name and phone are managed on the Profile tab.</p>
+          </div>
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-gray-700">Street address and area</span>
@@ -98,11 +75,11 @@ export default function AddressTab({ user, setUser }) {
               rows={4}
               autoComplete="street-address"
               placeholder="House or building, street, area, city"
-              value={form.address}
-              onChange={(event) => setForm({ ...form, address: event.target.value })}
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
               className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2.5 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
-            <span className="mt-1 block text-right text-xs text-gray-500">{form.address.length}/500</span>
+            <span className="mt-1 block text-right text-xs text-gray-500">{address.length}/500</span>
           </label>
 
           <div className="flex flex-wrap gap-3 pt-1">

@@ -9,6 +9,8 @@ import VolunteersPage from "./pages/VolunteersPage"
 import VolunteerProfilePage from "./pages/VolunteerProfilePage"
 import DonationsPage from "./pages/DonationsPage"
 import TransparencyPage from "./pages/TransparencyPage"
+import MarketplacePage from "./pages/MarketplacePage"
+import ProductPage from "./pages/ProductPage"
 import NotFound from "./pages/NotFound"
 
 function App() {
@@ -23,6 +25,8 @@ function App() {
         <Route path="/volunteers/:volunteerId" element={<VolunteerProfilePage />} />
         <Route path="/donations" element={<DonationsPage />} />
         <Route path="/transparency" element={<TransparencyPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/marketplace/:productId" element={<ProductPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/signin" element={<SignIn/>} />
         <Route path="/signup" element={<SignUp/>} />

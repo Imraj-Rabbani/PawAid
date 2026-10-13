@@ -33,6 +33,7 @@ export default function Navbar({ user: userProp }) {
     { label: "Community", path: "/" },
     { label: "Volunteers", path: "/volunteers" },
     { label: "Donations", path: "/donations" },
+    { label: "Marketplace", path: "/marketplace" },
     { label: "Transparency", path: "/transparency" },
     ...(user?.role === "ADMIN" ? [{ label: "Admin", path: "/admin" }] : []),
   ];
