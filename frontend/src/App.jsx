@@ -12,6 +12,8 @@ import TransparencyPage from "./pages/TransparencyPage"
 import MarketplacePage from "./pages/MarketplacePage"
 import ProductPage from "./pages/ProductPage"
 import CartPage from "./pages/CartPage"
+import CheckoutPage from "./pages/CheckoutPage"
+import OrderPage from "./pages/OrderPage"
 import NotFound from "./pages/NotFound"
 
 function App() {
@@ -29,6 +31,8 @@ function App() {
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/marketplace/:productId" element={<ProductPage />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/orders/:orderId" element={<OrderPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/signin" element={<SignIn/>} />
         <Route path="/signup" element={<SignUp/>} />

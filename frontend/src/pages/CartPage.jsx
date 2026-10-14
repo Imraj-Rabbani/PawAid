@@ -1,44 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import api from "../services/api";
+import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Icon from "../components/Icon";
 import { ProductImage } from "../components/marketplace/ProductCard";
 import QuantityStepper from "../components/marketplace/QuantityStepper";
 import { taka } from "../components/marketplace/marketplaceUtils";
 import { useCart, maxQuantity } from "../context/cartContext";
+import useCartSync from "../context/useCartSync";
 
 export default function CartPage() {
-  const { items, count, subtotal, rescueTotal, setQuantity, removeItem, clear, syncProducts } = useCart();
-  const [syncError, setSyncError] = useState("");
-  // products already checked against the server on this visit
-  const synced = useRef(new Set());
-
-  const idsKey = items.map((item) => item.productId).sort().join(",");
-
-  // prices, stock and availability may have changed since the items were added
-  useEffect(() => {
-    const ids = idsKey.split(",").filter((id) => id && !synced.current.has(id));
-    if (ids.length === 0) return;
-    let ignore = false;
-
-    api
-      .get("/marketplace/products", { params: { ids: ids.join(","), limit: 48 } })
-      .then((res) => {
-        if (ignore) return;
-        ids.forEach((id) => synced.current.add(id));
-        syncProducts(res.data.data.filter((product) => ids.includes(product.id)));
-        setSyncError("");
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!ignore) setSyncError("Couldn't check the latest prices and stock. Showing what was saved.");
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [idsKey, syncProducts]);
+  const navigate = useNavigate();
+  const { items, count, subtotal, rescueTotal, setQuantity, removeItem, clear } = useCart();
+  const { syncError } = useCartSync();
 
   const unavailableCount = items.filter((item) => item.unavailable || item.product.stockQty <= 0).length;
 
@@ -119,7 +91,7 @@ export default function CartPage() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-on-surface-variant">Delivery</dt>
-                  <dd className="text-on-surface-variant">Calculated at checkout</dd>
+                  <dd className="font-semibold text-secondary">Free</dd>
                 </div>
                 <div className="flex justify-between pt-3 border-t border-surface-container-high">
                   <dt className="font-semibold text-on-surface">Total</dt>
@@ -145,14 +117,13 @@ export default function CartPage() {
 
               <button
                 type="button"
-                disabled
-                className="mt-5 w-full px-5 py-3 text-sm font-semibold text-white bg-primary rounded-xl shadow-sm opacity-50 cursor-not-allowed"
+                onClick={() => navigate("/checkout")}
+                disabled={subtotal === 0}
+                className="mt-5 w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-primary rounded-xl shadow-sm hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
+                <Icon name="lock" className="text-[18px]" />
                 Proceed to checkout
               </button>
-              <p className="mt-2 text-center text-xs text-on-surface-variant">
-                Checkout is coming soon. Your cart is saved on this device.
-              </p>
             </aside>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/api';
 import { z } from "zod";
 
@@ -10,6 +10,10 @@ const loginSchema = z.object({
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // only same-site paths, so the link can't send someone to another website
+  const redirect = searchParams.get('redirect');
+  const afterSignIn = redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,7 +63,7 @@ const SignIn = () => {
         localStorage.setItem('user', JSON.stringify(response.user));
       }
 
-      navigate('/');
+      navigate(afterSignIn, { replace: true });
     } catch (error) {
       const message =
         error.response?.data?.message ||

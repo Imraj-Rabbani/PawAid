@@ -369,6 +369,10 @@ model Order {
   totalAmount Int @map("total_amount")
   paymentMethod PaymentMethod @map("payment_method")
   status OrderStatus @default(PENDING)
+  // delivery details as entered at checkout, kept even if the profile changes later
+  deliveryName String? @map("delivery_name")
+  deliveryPhone String? @map("delivery_phone")
+  deliveryAddress String? @map("delivery_address")
   createdAt DateTime @default(now()) @map("created_at")
   buyer User @relation(fields: [buyerId], references: [id])
   payment Payment @relation(fields: [paymentId], references: [id])

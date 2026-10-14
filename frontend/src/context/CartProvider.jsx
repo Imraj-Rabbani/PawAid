@@ -99,6 +99,11 @@ export default function CartProvider({ children }) {
     [update]
   );
 
+  const removeItems = useCallback(
+    (productIds) => update((items) => items.filter((item) => !productIds.includes(item.productId))),
+    [update]
+  );
+
   const clear = useCallback(() => update(() => []), [update]);
 
   // Replace saved snapshots with the server's current products. Anything missing
@@ -134,10 +139,11 @@ export default function CartProvider({ children }) {
       addItem,
       setQuantity,
       removeItem,
+      removeItems,
       clear,
       syncProducts,
     };
-  }, [stored, userId, addItem, setQuantity, removeItem, clear, syncProducts]);
+  }, [stored, userId, addItem, setQuantity, removeItem, removeItems, clear, syncProducts]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -19,6 +19,7 @@ import { homeSummary } from "../modules/home/home.controller.js";
 import { transparencyOverview } from "../modules/transparency/transparency.controller.js";
 import { reportPost } from "../modules/report/report.controller.js";
 import { getProduct, listMarketplaceCategories, listProducts } from "../modules/marketplace/marketplace.controller.js";
+import { createOrder, getOrder } from "../modules/order/order.controller.js";
 
 const router = Router()
 
@@ -38,6 +39,8 @@ router.get("/transparency", transparencyOverview)
 router.get("/marketplace/products", listProducts)
 router.get("/marketplace/products/:productId", getProduct)
 router.get("/marketplace/categories", listMarketplaceCategories)
+router.post("/orders", requireAuth, createOrder)
+router.get("/orders/:orderId", requireAuth, getOrder)
 
 
 router.get("/area", listAreas)
