@@ -1,6 +1,8 @@
 import z from "zod";
 import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
+import { creditWallet } from "../../services/wallet.services.js";
+import { orderNumber } from "../order/order.controller.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -44,7 +46,7 @@ export async function getStats(req, res) {
 
         const [
             usersByRole, usersByStatus, newUsers, volunteersByStatus, postsByStatus,
-            reportsByStatus, areas, donations, monthDonations, topUps, walletTotal,
+            reportsByStatus, areas, donations, monthDonations, topUps, walletTotal, ordersByStatus,
         ] = await Promise.all([
             prisma.user.groupBy({ by: ["role"], _count: true }),
             prisma.user.groupBy({ by: ["status"], _count: true }),
@@ -60,6 +62,7 @@ export async function getStats(req, res) {
                 _sum: { amount: true },
             }),
             prisma.wallet.aggregate({ _sum: { balance: true } }),
+            prisma.order.groupBy({ by: ["status"], _count: true }),
         ])
 
         // groupBy rows -> { KEY: count }
@@ -86,6 +89,10 @@ export async function getStats(req, res) {
                 reports: {
                     total: total(reportsByStatus),
                     byStatus: tally(reportsByStatus, "status"),
+                },
+                orders: {
+                    total: total(ordersByStatus),
+                    byStatus: tally(ordersByStatus, "status"),
                 },
                 areas,
                 finance: {
@@ -863,6 +870,220 @@ export async function updateProduct(req, res) {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to update product" });
+    }
+}
+
+
+// ========================================
+// MARKETPLACE ORDERS (PRD §15, §22)
+// ========================================
+
+const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"]
+const PAYMENT_METHODS = ["CASH", "BKASH", "NAGAD", "CARD", "BANK_TRANSFER", "WALLET", "OTHER"]
+
+// orders only move forward, and can be cancelled until they are delivered
+const ORDER_FLOW = {
+    PENDING: ["CONFIRMED", "CANCELLED"],
+    CONFIRMED: ["PROCESSING", "CANCELLED"],
+    PROCESSING: ["SHIPPED", "CANCELLED"],
+    SHIPPED: ["DELIVERED", "CANCELLED"],
+}
+
+const orderStatusSchema = z.object({
+    status: z.enum(["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"], "Invalid order status."),
+})
+
+const adminOrderSelect = {
+    id: true,
+    totalAmount: true,
+    paymentMethod: true,
+    status: true,
+    deliveryName: true,
+    deliveryPhone: true,
+    deliveryAddress: true,
+    createdAt: true,
+    buyer: { select: { ...publicUserSelect, email: true, phone: true } },
+    payment: { select: { status: true } },
+    items: {
+        select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            product: { select: { id: true, name: true, imageUrl: true } },
+        },
+    },
+}
+
+class OrderConflictError extends Error {}
+
+// order numbers are the first 8 characters of the id, which Prisma can't prefix
+// match on a uuid column, so look those up directly
+async function orderIdsByNumber(search) {
+    const number = search.replace(/^#/, "")
+    if (!/^[0-9a-f]{4,8}$/i.test(number)) return []
+    const rows = await prisma.$queryRaw`
+        SELECT id FROM orders WHERE id::text ILIKE ${`${number.toLowerCase()}%`} LIMIT 100
+    `
+    return rows.map((row) => row.id)
+}
+
+export async function listOrders(req, res) {
+    try {
+        const paging = pageParams(req.query)
+        const search = searchTerm(req.query)
+        const status = enumFilter(ORDER_STATUSES, req.query.status)
+        const ids = search ? await orderIdsByNumber(search) : []
+
+        // everything but the status, so the status chips can show their counts
+        const baseWhere = {
+            paymentMethod: enumFilter(PAYMENT_METHODS, req.query.paymentMethod),
+            ...(search && {
+                OR: [
+                    { id: { in: ids } },
+                    { buyer: { name: { contains: search, mode: "insensitive" } } },
+                    { buyer: { email: { contains: search, mode: "insensitive" } } },
+                    { deliveryName: { contains: search, mode: "insensitive" } },
+                    { deliveryPhone: { contains: search } },
+                ],
+            }),
+        }
+        const where = { ...baseWhere, status }
+
+        const [orders, total, byStatus] = await Promise.all([
+            prisma.order.findMany({
+                where,
+                select: adminOrderSelect,
+                // pending orders are a queue, so the oldest comes first
+                orderBy: [{ createdAt: status === "PENDING" ? "asc" : "desc" }, { id: "asc" }],
+                skip: paging.skip,
+                take: paging.limit,
+            }),
+            prisma.order.count({ where }),
+            prisma.order.groupBy({ by: ["status"], where: baseWhere, _count: true }),
+        ])
+
+        return res.json({
+            message: "Orders listed",
+            data: orders,
+            counts: Object.fromEntries(byStatus.map((row) => [row.status, row._count])),
+            pagination: pageInfo(paging, total),
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch orders" });
+    }
+}
+
+// Delivering a cash order means the courier collected the money, so the sale
+// counts from then on. Cancelling puts the items back in stock and refunds a
+// wallet payment through the ledger (PRD §27, §40).
+export async function updateOrderStatus(req, res) {
+    try {
+        const orderId = z.uuid().safeParse(req.params.orderId)
+        if (!orderId.success) {
+            return res.status(404).json({ message: "Order not found" })
+        }
+
+        const parsed = orderStatusSchema.safeParse(req.body ?? {})
+        if (!parsed.success) return validationError(res, parsed)
+
+        const { status } = parsed.data
+
+        const order = await prisma.order.findUnique({
+            where: { id: orderId.data },
+            select: {
+                id: true,
+                status: true,
+                buyerId: true,
+                paymentId: true,
+                totalAmount: true,
+                payment: { select: { status: true } },
+                buyer: { select: { wallet: { select: { id: true } } } },
+                financialTransaction: { select: { relatedVolunteerId: true } },
+                // same lock order as checkout, so a cancel and a checkout can't deadlock
+                items: { select: { productId: true, quantity: true }, orderBy: { productId: "asc" } },
+            },
+        })
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" })
+        }
+
+        if (!ORDER_FLOW[order.status]?.includes(status)) {
+            return res.status(400).json({
+                message: `A ${order.status.toLowerCase()} order can't be marked ${status.toLowerCase()}`,
+            })
+        }
+
+        const number = orderNumber(order.id)
+        const refunded = status === "CANCELLED" && order.payment.status === "COMPLETED"
+
+        const updated = await prisma.$transaction(async (tx) => {
+            // only moves the order if nobody else has since, so two admins can't
+            // both cancel it and refund it twice
+            const { count } = await tx.order.updateMany({
+                where: { id: order.id, status: order.status },
+                data: { status },
+            })
+            if (count === 0) throw new OrderConflictError()
+
+            if (status === "DELIVERED" && order.payment.status === "PENDING") {
+                await tx.payment.update({ where: { id: order.paymentId }, data: { status: "COMPLETED" } })
+                await tx.financialTransaction.updateMany({
+                    where: { relatedOrderId: order.id, status: "PENDING" },
+                    data: { status: "COMPLETED" },
+                })
+            }
+
+            if (status === "CANCELLED") {
+                for (const { productId, quantity } of order.items) {
+                    await tx.product.update({ where: { id: productId }, data: { stockQty: { increment: quantity } } })
+                }
+
+                if (refunded) {
+                    // the payment row stays as it was; the refund is its own ledger entry
+                    const refund = await tx.financialTransaction.create({
+                        data: {
+                            type: "REFUND",
+                            source: "MARKETPLACE",
+                            destination: "WALLET",
+                            amount: order.totalAmount,
+                            relatedUserId: order.buyerId,
+                            relatedVolunteerId: order.financialTransaction?.relatedVolunteerId ?? null,
+                            paymentId: order.paymentId,
+                            status: "COMPLETED",
+                            reference: `Refund for order #${number}`,
+                        },
+                    })
+                    await creditWallet(tx, {
+                        walletId: order.buyer.wallet.id,
+                        amount: order.totalAmount,
+                        transactionId: refund.id,
+                        reference: `Refund for cancelled order #${number}`,
+                    })
+                    await tx.payment.update({ where: { id: order.paymentId }, data: { status: "REFUNDED" } })
+                } else {
+                    // cash that was never collected
+                    await tx.payment.update({ where: { id: order.paymentId }, data: { status: "FAILED" } })
+                    await tx.financialTransaction.updateMany({
+                        where: { relatedOrderId: order.id, status: "PENDING" },
+                        data: { status: "CANCELLED" },
+                    })
+                }
+            }
+
+            return tx.order.findUnique({ where: { id: order.id }, select: adminOrderSelect })
+        })
+
+        return res.json({
+            message: refunded ? "Order cancelled and refunded to the buyer's wallet" : `Order #${number} updated`,
+            data: updated,
+        })
+    } catch (error) {
+        if (error instanceof OrderConflictError) {
+            return res.status(409).json({ message: "This order was just updated by someone else. Refresh and try again." })
+        }
+        console.error(error);
+        res.status(500).json({ message: "Failed to update order" });
     }
 }
 

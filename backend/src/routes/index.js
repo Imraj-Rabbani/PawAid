@@ -9,8 +9,8 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import {
     createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts,
-    listCategories, listReports, listTransactions, listUsers, listVolunteers, renameArea, updatePostStatus,
-    updateProduct, updateReportStatus, updateUserStatus, updateVolunteerStatus,
+    listCategories, listOrders, listReports, listTransactions, listUsers, listVolunteers, renameArea, updateOrderStatus,
+    updatePostStatus, updateProduct, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
 import { myWallet, myWalletTransactions, topUpWallet, transferToVolunteer } from "../modules/wallet/wallet.controller.js";
 import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
@@ -81,6 +81,8 @@ router.post("/admin/categories", createCategory)
 router.get("/admin/products", listAdminProducts)
 router.post("/admin/products", upload.single("image"), createProduct)
 router.patch("/admin/products/:productId", upload.single("image"), updateProduct)
+router.get("/admin/orders", listOrders)
+router.patch("/admin/orders/:orderId/status", updateOrderStatus)
 
 
 router.get("/volunteer", volunteers)

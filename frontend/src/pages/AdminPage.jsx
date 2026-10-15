@@ -10,6 +10,7 @@ import UsersTab from "../components/admin/UsersTab";
 import VolunteersTab from "../components/admin/VolunteersTab";
 import AreasTab from "../components/admin/AreasTab";
 import ProductsTab from "../components/admin/ProductsTab";
+import OrdersTab from "../components/admin/OrdersTab";
 import TransactionsTab from "../components/admin/TransactionsTab";
 import { errorMessage } from "../components/admin/adminUtils";
 
@@ -21,6 +22,7 @@ const TABS = [
   { value: "volunteers", label: "Volunteers", icon: "volunteer_activism" },
   { value: "areas", label: "Areas", icon: "location_on" },
   { value: "products", label: "Products", icon: "storefront" },
+  { value: "orders", label: "Orders", icon: "local_shipping" },
   { value: "transactions", label: "Transactions", icon: "receipt_long" },
 ];
 
@@ -75,6 +77,7 @@ export default function AdminPage() {
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const pendingReports = stats?.reports.byStatus.PENDING ?? 0;
+  const pendingOrders = stats?.orders.byStatus.PENDING ?? 0;
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
@@ -96,7 +99,7 @@ export default function AdminPage() {
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {TABS.map((t) => {
               const active = tab === t.value;
-              const badge = t.value === "reports" ? pendingReports : 0;
+              const badge = { reports: pendingReports, orders: pendingOrders }[t.value] ?? 0;
               return (
                 <button
                   key={t.value}
@@ -142,6 +145,7 @@ export default function AdminPage() {
               {tab === "volunteers" && <VolunteersTab areas={areas} onChange={refresh} />}
               {tab === "areas" && <AreasTab onChange={refresh} />}
               {tab === "products" && <ProductsTab />}
+              {tab === "orders" && <OrdersTab onChange={refresh} />}
               {tab === "transactions" && <TransactionsTab />}
             </>
           )}

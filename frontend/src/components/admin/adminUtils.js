@@ -57,6 +57,29 @@ export const TRANSACTION_TYPE = {
   REFUND: { label: "Refund", tone: "neutral" },
 };
 
+export const ORDER_STATUS = {
+  PENDING: { label: "Pending", tone: "warning" },
+  CONFIRMED: { label: "Confirmed", tone: "info" },
+  PROCESSING: { label: "Processing", tone: "info" },
+  SHIPPED: { label: "Shipped", tone: "info" },
+  DELIVERED: { label: "Delivered", tone: "success" },
+  CANCELLED: { label: "Cancelled", tone: "danger" },
+  REFUNDED: { label: "Refunded", tone: "neutral" },
+};
+
+export const PAYMENT_STATUS = {
+  PENDING: { label: "Due on delivery", tone: "warning" },
+  COMPLETED: { label: "Paid", tone: "success" },
+  REFUNDED: { label: "Refunded", tone: "neutral" },
+  FAILED: { label: "Not collected", tone: "neutral" },
+};
+
+// only cash and wallet are offered at checkout for now
+export const PAYMENT_METHOD = {
+  CASH: { label: "Cash on delivery" },
+  WALLET: { label: "Wallet" },
+};
+
 // keyed by the ?status= filter the products endpoint takes
 export const PRODUCT_STATUS = {
   active: { label: "Active", tone: "success" },

@@ -1,16 +1,17 @@
 import Icon from "../Icon";
 import { Panel } from "./ui";
-import { POST_STATUS, REPORT_STATUS, ROLE, USER_STATUS, VOLUNTEER_STATUS, taka } from "./adminUtils";
+import { ORDER_STATUS, POST_STATUS, REPORT_STATUS, ROLE, USER_STATUS, VOLUNTEER_STATUS, taka } from "./adminUtils";
 
 export default function OverviewTab({ stats, onNavigate }) {
-  const { users, volunteers, posts, reports, finance } = stats;
+  const { users, volunteers, posts, reports, orders, finance } = stats;
   const pendingReports = reports.byStatus.PENDING ?? 0;
   const openRescues = posts.byStatus.OPEN ?? 0;
+  const pendingOrders = orders.byStatus.PENDING ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
       {/* ── Needs attention ── */}
-      {(pendingReports > 0 || openRescues > 0) && (
+      {(pendingReports > 0 || openRescues > 0 || pendingOrders > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {pendingReports > 0 && (
             <AttentionCard
@@ -26,6 +27,14 @@ export default function OverviewTab({ stats, onNavigate }) {
               text={`${openRescues} ${openRescues === 1 ? "rescue has" : "rescues have"} no volunteer yet`}
               action="View posts"
               onClick={() => onNavigate("posts")}
+            />
+          )}
+          {pendingOrders > 0 && (
+            <AttentionCard
+              icon="local_shipping"
+              text={`${pendingOrders} ${pendingOrders === 1 ? "order is" : "orders are"} waiting to be confirmed`}
+              action="View orders"
+              onClick={() => onNavigate("orders")}
             />
           )}
         </div>
@@ -62,6 +71,7 @@ export default function OverviewTab({ stats, onNavigate }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Breakdown title="Rescue posts by status" map={POST_STATUS} counts={posts.byStatus} onMore={() => onNavigate("posts")} />
         <Breakdown title="Reports by status" map={REPORT_STATUS} counts={reports.byStatus} onMore={() => onNavigate("reports")} />
+        <Breakdown title="Orders by status" map={ORDER_STATUS} counts={orders.byStatus} onMore={() => onNavigate("orders")} />
         <Breakdown title="Users by role" map={ROLE} counts={users.byRole} onMore={() => onNavigate("users")} />
         <Breakdown
           title="Account status"

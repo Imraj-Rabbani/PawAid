@@ -17,7 +17,7 @@ export async function transparencyOverview(req, res) {
       donations, monthDonations, donationsByDestination, donors, topUps,
       movedFromRescues, heldForRescues, volunteerWallets, activeVolunteers,
       postsByStatus, fundedRescues,
-      products, revenue, profitRows, rescueFund,
+      products, revenue, refunds, profitRows, rescueFund,
     ] = await Promise.all([
       prisma.financialTransaction.aggregate({ where: { ...completed, type: "DONATION" }, _sum: { amount: true }, _count: true }),
       prisma.financialTransaction.aggregate({
@@ -42,13 +42,20 @@ export async function transparencyOverview(req, res) {
       prisma.rescuePost.count({ where: { donationReceived: { gt: 0 }, status: { not: "CANCELLED" } } }),
       prisma.product.count({ where: { active: true } }),
       prisma.financialTransaction.aggregate({ where: { ...completed, type: "ORDER_PAYMENT" }, _sum: { amount: true } }),
-      // profit is per item: what it sold for minus what it cost, for every sold order
+      // cancelled orders paid from a wallet are refunded, and stop counting as revenue
+      prisma.financialTransaction.aggregate({
+        where: { ...completed, type: "REFUND", source: "MARKETPLACE" },
+        _sum: { amount: true },
+      }),
+      // profit is per item: what it sold for minus what it cost, for every sold and
+      // paid order (cash on delivery is only paid once it is delivered)
       prisma.$queryRaw`
         SELECT COALESCE(SUM((oi.unit_price - p.cost_price) * oi.quantity), 0)::int AS profit
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
+        JOIN payments pay ON pay.id = o.payment_id
         JOIN products p ON p.id = oi.product_id
-        WHERE o.status::text = ANY(${SOLD_ORDER_STATUSES})
+        WHERE o.status::text = ANY(${SOLD_ORDER_STATUSES}) AND pay.status = 'COMPLETED'
       `,
       // total_available is everything the fund has received, total_used what it has paid out
       prisma.rescueFund.aggregate({ _sum: { totalAvailable: true, totalUsed: true } }),
@@ -91,7 +98,7 @@ export async function transparencyOverview(req, res) {
         },
         marketplace: {
           live: products > 0,
-          revenue: revenue._sum.amount ?? 0,
+          revenue: (revenue._sum.amount ?? 0) - (refunds._sum.amount ?? 0),
           profit: profitRows[0]?.profit ?? 0,
         },
         rescueFund: {
