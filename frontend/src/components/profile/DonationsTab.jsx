@@ -75,18 +75,21 @@ export default function DonationsTab({ isVolunteer }) {
 function DonationRow({ donation, made }) {
   const { amount, createdAt, payment, rescuePost } = donation;
   // made: who/what it went to; received: who it came from
+  const fromFund = !made && donation.rescueFundId;
   const person = made ? donation.volunteer?.user : donation.donor;
   const title = made
     ? rescuePost
       ? `To rescue: ${rescuePost.title}`
       : `To ${person?.name}`
-    : `From ${person?.name}`;
+    : fromFund
+      ? "From the PawAid Fund"
+      : `From ${person?.name}`;
 
   return (
     <li className="flex items-center gap-4 py-4">
       <img
-        src={person?.profilePictureUrl || "/default-avatar.png"}
-        alt={person?.name || "Rescue post"}
+        src={fromFund ? "/logo.png" : person?.profilePictureUrl || "/default-avatar.png"}
+        alt={fromFund ? "PawAid Fund" : person?.name || "Rescue post"}
         className="w-12 h-12 rounded-full object-cover"
       />
       <div className="flex-1 min-w-0">

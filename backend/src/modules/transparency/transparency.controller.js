@@ -1,7 +1,7 @@
 import { prisma } from "../../db.js";
 
-// orders that have been paid for and not cancelled or refunded count as sales
-const SOLD_ORDER_STATUSES = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"];
+// donations made by people, as opposed to by the PawAid Fund
+const fromCommunity = { donorId: { not: null } };
 
 
 // Public financial overview (PRD §19, §41). Aggregates only: nothing here may
@@ -17,7 +17,7 @@ export async function transparencyOverview(req, res) {
       donations, monthDonations, donationsByDestination, donors, topUps,
       movedFromRescues, heldForRescues, volunteerWallets, activeVolunteers,
       postsByStatus, fundedRescues,
-      products, revenue, refunds, profitRows, rescueFund,
+      products, revenue, refunds, profit, fundGiven, fundByDestination, fundRecent,
     ] = await Promise.all([
       prisma.financialTransaction.aggregate({ where: { ...completed, type: "DONATION" }, _sum: { amount: true }, _count: true }),
       prisma.financialTransaction.aggregate({
@@ -25,9 +25,9 @@ export async function transparencyOverview(req, res) {
         _sum: { amount: true },
         _count: true,
       }),
-      prisma.donation.groupBy({ by: ["destinationType"], _sum: { amount: true } }),
+      prisma.donation.groupBy({ by: ["destinationType"], where: fromCommunity, _sum: { amount: true } }),
       // a count of distinct donors, never who they are
-      prisma.donation.groupBy({ by: ["donorId"] }).then((rows) => rows.length),
+      prisma.donation.groupBy({ by: ["donorId"], where: fromCommunity }).then((rows) => rows.length),
       prisma.financialTransaction.aggregate({ where: { ...completed, source: "TOP_UP" }, _sum: { amount: true } }),
       // money a rescue raised before a volunteer took it, then handed to them
       prisma.financialTransaction.aggregate({
@@ -47,26 +47,42 @@ export async function transparencyOverview(req, res) {
         where: { ...completed, type: "REFUND", source: "MARKETPLACE" },
         _sum: { amount: true },
       }),
-      // profit is per item: what it sold for minus what it cost, for every sold and
-      // paid order (cash on delivery is only paid once it is delivered)
-      prisma.$queryRaw`
-        SELECT COALESCE(SUM((oi.unit_price - p.cost_price) * oi.quantity), 0)::int AS profit
-        FROM order_items oi
-        JOIN orders o ON o.id = oi.order_id
-        JOIN payments pay ON pay.id = o.payment_id
-        JOIN products p ON p.id = oi.product_id
-        WHERE o.status::text = ANY(${SOLD_ORDER_STATUSES}) AND pay.status = 'COMPLETED'
-      `,
-      // total_available is everything the fund has received, total_used what it has paid out
-      prisma.rescueFund.aggregate({ _sum: { totalAvailable: true, totalUsed: true } }),
+      // profit is posted to the PawAid Fund once an order is delivered
+      prisma.financialTransaction.aggregate({
+        where: { ...completed, type: "MARKETPLACE_PROFIT" },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.financialTransaction.aggregate({
+        where: { ...completed, type: "RESCUE_FUND_ALLOCATION" },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      // what the admin chose to give to; a rescue's money still reaches its volunteer
+      prisma.donation.groupBy({ by: ["destinationType"], where: { rescueFundId: { not: null } }, _sum: { amount: true } }),
+      // the fund is the donor here, so naming who received it identifies no one's giving
+      prisma.donation.findMany({
+        where: { rescueFundId: { not: null } },
+        select: {
+          id: true,
+          amount: true,
+          destinationType: true,
+          createdAt: true,
+          rescuePost: { select: { id: true, title: true } },
+          volunteer: { select: { id: true, user: { select: { id: true, name: true, profilePictureUrl: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+      }),
     ])
 
     const byDestination = (type) =>
       donationsByDestination.find((d) => d.destinationType === type)?._sum.amount ?? 0
     const postCount = (status) => postsByStatus.find((p) => p.status === status)?._count ?? 0
 
-    const fundTotal = rescueFund._sum.totalAvailable ?? 0
-    const fundUsed = rescueFund._sum.totalUsed ?? 0
+    const fundIn = profit._sum.amount ?? 0
+    const fundOut = fundGiven._sum.amount ?? 0
+    const fundGivenTo = (type) => fundByDestination.find((d) => d.destinationType === type)?._sum.amount ?? 0
     const directToVolunteers = byDestination("VOLUNTEER")
 
     return res.json({
@@ -99,12 +115,17 @@ export async function transparencyOverview(req, res) {
         marketplace: {
           live: products > 0,
           revenue: (revenue._sum.amount ?? 0) - (refunds._sum.amount ?? 0),
-          profit: profitRows[0]?.profit ?? 0,
+          profit: fundIn,
+          deliveredOrders: profit._count,
         },
-        rescueFund: {
-          contributed: fundTotal,
-          used: fundUsed,
-          remaining: fundTotal - fundUsed,
+        pawaidFund: {
+          received: fundIn,
+          donated: fundOut,
+          balance: fundIn - fundOut,
+          toVolunteers: fundGivenTo("VOLUNTEER"),
+          toRescues: fundGivenTo("RESCUE_POST"),
+          donationCount: fundGiven._count,
+          recent: fundRecent,
         },
         generatedAt: now,
       },

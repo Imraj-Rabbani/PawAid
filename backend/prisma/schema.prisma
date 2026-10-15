@@ -98,6 +98,10 @@ enum FinancialTransactionType {
   DONATION
   ORDER_PAYMENT
   REFUND
+  // profit from a delivered order, paid into the PawAid Fund
+  MARKETPLACE_PROFIT
+  // a donation the PawAid Fund makes to a volunteer or rescue post
+  RESCUE_FUND_ALLOCATION
 }
 
 enum FinancialTransactionStatus {
@@ -272,16 +276,19 @@ model PostReport {
 // DONATION
 // ========================================
 
+// donorId is null when the PawAid Fund made the donation (rescueFundId is set instead)
 model Donation {
   id String @id @default(uuid()) @db.Uuid
-  donorId String @map("donor_id") @db.Uuid
+  donorId String? @map("donor_id") @db.Uuid
+  rescueFundId String? @map("rescue_fund_id") @db.Uuid
   rescuePostId String? @map("rescue_post_id") @db.Uuid
   volunteerId String? @map("volunteer_id") @db.Uuid
   paymentId String @unique @map("payment_id") @db.Uuid
   amount Int
   destinationType DonationDestinationType @map("destination_type")
   createdAt DateTime @default(now()) @map("created_at")
-  donor User @relation(fields: [donorId], references: [id])
+  donor User? @relation(fields: [donorId], references: [id], onDelete: Restrict)
+  rescueFund RescueFund? @relation(fields: [rescueFundId], references: [id], onDelete: Restrict)
   rescuePost RescuePost? @relation(fields: [rescuePostId], references: [id])
   volunteer VolunteerProfile? @relation(fields: [volunteerId], references: [id])
   payment Payment @relation(fields: [paymentId], references: [id])
@@ -289,6 +296,7 @@ model Donation {
   @@index([donorId])
   @@index([rescuePostId])
   @@index([volunteerId])
+  @@index([rescueFundId])
   @@map("donations")
 }
 
@@ -393,6 +401,8 @@ model OrderItem {
   productId String @map("product_id") @db.Uuid
   quantity Int
   unitPrice Int @map("unit_price")
+  // the product's cost when it sold, so later cost edits don't change past profit
+  unitCost Int @map("unit_cost")
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
   @@index([orderId])
@@ -458,12 +468,16 @@ model FinancialTransaction {
 // RESCUE FUND
 // ========================================
 
+// The PawAid Fund: a single row, where marketplace profit collects and from
+// which admins donate. total_available is everything it has received,
+// total_used everything it has given out.
 model RescueFund {
   id String @id @default(uuid()) @db.Uuid
   totalAvailable Int @default(0) @map("total_available")
   totalUsed Int @default(0) @map("total_used")
   updatedAt DateTime @updatedAt @map("updated_at")
   transactions FinancialTransaction[]
+  donations Donation[]
   expenses RescueExpense[]
   @@map("rescue_funds")
 }

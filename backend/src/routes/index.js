@@ -13,7 +13,7 @@ import {
     updatePostStatus, updateProduct, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
 import { myWallet, myWalletTransactions, topUpWallet, transferToVolunteer } from "../modules/wallet/wallet.controller.js";
-import { donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
+import { donateFromFund, donateToPost, donateToVolunteer, listDonations, myDonations } from "../modules/donation/donation.controller.js";
 import { createComment, deleteComment, listComments } from "../modules/comment/comment.controller.js";
 import { homeSummary } from "../modules/home/home.controller.js";
 import { transparencyOverview } from "../modules/transparency/transparency.controller.js";
@@ -83,6 +83,7 @@ router.post("/admin/products", upload.single("image"), createProduct)
 router.patch("/admin/products/:productId", upload.single("image"), updateProduct)
 router.get("/admin/orders", listOrders)
 router.patch("/admin/orders/:orderId/status", updateOrderStatus)
+router.post("/admin/fund/donations", donateFromFund)
 
 
 router.get("/volunteer", volunteers)

@@ -2,6 +2,7 @@ import z from "zod";
 import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
 import { creditWallet } from "../../services/wallet.services.js";
+import { creditFund, PAWAID_FUND_ID } from "../../services/fund.services.js";
 import { orderNumber } from "../order/order.controller.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
@@ -55,8 +56,13 @@ export async function getStats(req, res) {
             prisma.rescuePost.groupBy({ by: ["status"], _count: true }),
             prisma.postReport.groupBy({ by: ["status"], _count: true }),
             prisma.rescueArea.count(),
-            prisma.donation.aggregate({ _sum: { amount: true }, _count: true }),
-            prisma.donation.aggregate({ where: { createdAt: { gte: monthStart } }, _sum: { amount: true }, _count: true }),
+            // community donations only; the PawAid Fund's donations are marketplace profit
+            prisma.donation.aggregate({ where: { donorId: { not: null } }, _sum: { amount: true }, _count: true }),
+            prisma.donation.aggregate({
+                where: { donorId: { not: null }, createdAt: { gte: monthStart } },
+                _sum: { amount: true },
+                _count: true,
+            }),
             prisma.financialTransaction.aggregate({
                 where: { source: "TOP_UP", status: "COMPLETED" },
                 _sum: { amount: true },
@@ -1001,7 +1007,10 @@ export async function updateOrderStatus(req, res) {
                 buyer: { select: { wallet: { select: { id: true } } } },
                 financialTransaction: { select: { relatedVolunteerId: true } },
                 // same lock order as checkout, so a cancel and a checkout can't deadlock
-                items: { select: { productId: true, quantity: true }, orderBy: { productId: "asc" } },
+                items: {
+                    select: { productId: true, quantity: true, unitPrice: true, unitCost: true },
+                    orderBy: { productId: "asc" },
+                },
             },
         })
         if (!order) {
@@ -1032,6 +1041,29 @@ export async function updateOrderStatus(req, res) {
                     where: { relatedOrderId: order.id, status: "PENDING" },
                     data: { status: "COMPLETED" },
                 })
+            }
+
+            // a delivered order is a final sale, so its profit goes into the PawAid Fund.
+            // DELIVERED can only be reached once (the claim above), so it is never paid twice
+            if (status === "DELIVERED") {
+                const profit = order.items.reduce(
+                    (sum, item) => sum + Math.max(item.unitPrice - item.unitCost, 0) * item.quantity,
+                    0,
+                )
+                if (profit > 0) {
+                    await tx.financialTransaction.create({
+                        data: {
+                            type: "MARKETPLACE_PROFIT",
+                            source: "MARKETPLACE",
+                            destination: "PAWAID_FUND",
+                            amount: profit,
+                            rescueFundId: PAWAID_FUND_ID,
+                            status: "COMPLETED",
+                            reference: `Profit from order #${number}`,
+                        },
+                    })
+                    await creditFund(tx, profit)
+                }
             }
 
             if (status === "CANCELLED") {
@@ -1072,7 +1104,7 @@ export async function updateOrderStatus(req, res) {
             }
 
             return tx.order.findUnique({ where: { id: order.id }, select: adminOrderSelect })
-        })
+        }, { maxWait: 10000, timeout: 20000 })
 
         return res.json({
             message: refunded ? "Order cancelled and refunded to the buyer's wallet" : `Order #${number} updated`,
@@ -1092,7 +1124,9 @@ export async function updateOrderStatus(req, res) {
 // FINANCIAL TRANSACTIONS (read only, PRD §27)
 // ========================================
 
-const TRANSACTION_TYPES = ["INCOME", "EXPENSE", "TRANSFER", "DONATION", "ORDER_PAYMENT", "REFUND"]
+const TRANSACTION_TYPES = [
+    "INCOME", "EXPENSE", "TRANSFER", "DONATION", "ORDER_PAYMENT", "REFUND", "MARKETPLACE_PROFIT", "RESCUE_FUND_ALLOCATION",
+]
 
 export async function listTransactions(req, res) {
     try {

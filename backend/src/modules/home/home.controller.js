@@ -21,13 +21,14 @@ export async function homeSummary(req, res) {
 
     const [monthDonations, allDonations, rescuesFunded, rescuesResolved, topGroups, discover] =
       await Promise.all([
-        prisma.donation.aggregate({ where: { createdAt: { gte: monthStart } }, _sum: { amount: true } }),
-        prisma.donation.aggregate({ _sum: { amount: true } }),
+        // community donations only; the PawAid Fund's donations are marketplace profit
+        prisma.donation.aggregate({ where: { donorId: { not: null }, createdAt: { gte: monthStart } }, _sum: { amount: true } }),
+        prisma.donation.aggregate({ where: { donorId: { not: null } }, _sum: { amount: true } }),
         prisma.rescuePost.count({ where: { donationReceived: { gt: 0 } } }),
         prisma.rescuePost.count({ where: { status: "RESOLVED" } }),
         prisma.donation.groupBy({
           by: ["volunteerId"],
-          where: { createdAt: { gte: monthStart }, volunteerId: { not: null }, volunteer: activeVolunteer },
+          where: { donorId: { not: null }, createdAt: { gte: monthStart }, volunteerId: { not: null }, volunteer: activeVolunteer },
           _sum: { amount: true },
           orderBy: { _sum: { amount: "desc" } },
           take: 3,

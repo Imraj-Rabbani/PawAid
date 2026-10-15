@@ -55,6 +55,8 @@ export const TRANSACTION_TYPE = {
   EXPENSE: { label: "Expense", tone: "danger" },
   ORDER_PAYMENT: { label: "Order", tone: "warning" },
   REFUND: { label: "Refund", tone: "neutral" },
+  MARKETPLACE_PROFIT: { label: "Profit to fund", tone: "success" },
+  RESCUE_FUND_ALLOCATION: { label: "Fund donation", tone: "info" },
 };
 
 export const ORDER_STATUS = {

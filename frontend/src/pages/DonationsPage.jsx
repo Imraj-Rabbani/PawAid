@@ -63,7 +63,12 @@ function DonationRow({ donation }) {
   return (
     <li className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4">
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <Party label="From" user={donor} />
+        {/* the PawAid Fund gives marketplace profit; it has no user behind it */}
+        {donation.rescueFundId ? (
+          <Party label="From" name="PawAid Fund" image="/logo.png" to="/transparency" />
+        ) : (
+          <Party label="From" user={donor} />
+        )}
         <svg
           className="w-5 h-5 text-gray-400 shrink-0"
           fill="none"
@@ -90,13 +95,13 @@ function DonationRow({ donation }) {
   );
 }
 
-function Party({ label, user, name, to }) {
+function Party({ label, user, name, image, to }) {
   const displayName = user?.name || name;
 
   return (
     <div className="flex items-center gap-2 flex-1 min-w-0">
       <img
-        src={user?.profilePictureUrl || "/default-avatar.png"}
+        src={user?.profilePictureUrl || image || "/default-avatar.png"}
         alt={displayName}
         className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-100 shrink-0"
       />

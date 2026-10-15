@@ -80,7 +80,7 @@ export async function createOrder(req, res) {
 
         const products = await prisma.product.findMany({
             where: { id: { in: productIds }, active: true },
-            select: { id: true, name: true, sellingPrice: true, stockQty: true },
+            select: { id: true, name: true, sellingPrice: true, costPrice: true, stockQty: true },
         })
         if (products.length !== productIds.length) {
             throw new CheckoutError("Some items in your cart are no longer available.", 409, "CART_CHANGED")
@@ -162,6 +162,7 @@ export async function createOrder(req, res) {
                             productId: product.id,
                             quantity,
                             unitPrice: product.sellingPrice,
+                            unitCost: product.costPrice,
                         })),
                     },
                 },

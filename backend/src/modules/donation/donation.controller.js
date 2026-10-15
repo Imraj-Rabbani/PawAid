@@ -1,6 +1,7 @@
 import z from "zod";
 import { prisma } from "../../db.js";
 import { creditWallet, debitWallet, InsufficientFundsError } from "../../services/wallet.services.js";
+import { debitFund, FundShortfallError, PAWAID_FUND_ID } from "../../services/fund.services.js";
 
 const donationSchema = z.object({
   amount: z
@@ -15,6 +16,8 @@ const donationSelect = {
   amount: true,
   destinationType: true,
   createdAt: true,
+  // set when the PawAid Fund made the donation; donor is null then
+  rescueFundId: true,
   payment: { select: { status: true } },
   rescuePost: { select: { id: true, title: true } },
 };
@@ -204,6 +207,44 @@ class PostDonationError extends Error {
   }
 }
 
+// Adds a donation to a rescue post's total, for donateToPost and donateFromFund.
+// Updating the post first locks its row, so a volunteer claiming the rescue at the
+// same moment either sees this donation in donationReceived (and moves it) or has
+// already been assigned (and the caller credits them). It is never lost or moved twice.
+async function addToPost(tx, postId, amount) {
+  const { count } = await tx.rescuePost.updateMany({
+    where: { id: postId, status: { in: DONATABLE_STATUSES }, donationTarget: { gt: 0 } },
+    data: { donationReceived: { increment: amount } },
+  })
+  if (count === 0) {
+    throw new PostDonationError("This rescue is not accepting donations")
+  }
+
+  const post = await tx.rescuePost.findUnique({
+    where: { id: postId },
+    select: {
+      id: true,
+      title: true,
+      donationReceived: true,
+      assignedVolunteer: {
+        select: {
+          id: true,
+          status: true,
+          userId: true,
+          user: { select: { wallet: { select: { id: true } } } },
+        },
+      },
+    },
+  })
+
+  const volunteer = post.assignedVolunteer
+  if (volunteer && (volunteer.status !== "ACTIVE" || !volunteer.user.wallet)) {
+    throw new PostDonationError("This rescue's volunteer is not active right now", 409)
+  }
+
+  return post
+}
+
 // Donate to a rescue post. With a volunteer on the rescue the money goes straight
 // to their wallet; without one it stays on the post until a volunteer takes it,
 // and assignPost moves it to their wallet then (PRD §9)
@@ -248,40 +289,11 @@ export async function donateToPost(req, res) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // Update the post first: this locks its row, so a volunteer claiming the rescue
-      // at the same moment either sees this donation in donationReceived (and moves it)
-      // or has already been assigned (and gets it below). It is never lost or moved twice.
-      const { count } = await tx.rescuePost.updateMany({
-        where: { id: post.id, status: { in: DONATABLE_STATUSES }, donationTarget: { gt: 0 } },
-        data: { donationReceived: { increment: amount } },
-      })
-      if (count === 0) {
-        throw new PostDonationError("This rescue is not accepting donations")
-      }
-
-      const updatedPost = await tx.rescuePost.findUnique({
-        where: { id: post.id },
-        select: {
-          id: true,
-          title: true,
-          donationReceived: true,
-          assignedVolunteer: {
-            select: {
-              id: true,
-              status: true,
-              userId: true,
-              user: { select: { wallet: { select: { id: true } } } },
-            },
-          },
-        },
-      })
+      const updatedPost = await addToPost(tx, post.id, amount)
 
       const volunteer = updatedPost.assignedVolunteer
       if (volunteer?.userId === donorId) {
         throw new PostDonationError("You cannot donate to a rescue you are handling")
-      }
-      if (volunteer && (volunteer.status !== "ACTIVE" || !volunteer.user.wallet)) {
-        throw new PostDonationError("This rescue's volunteer is not active right now", 409)
       }
 
       const payment = await tx.payment.create({
@@ -358,5 +370,113 @@ export async function donateToPost(req, res) {
     }
     console.error(error);
     res.status(500).json({ message: "Failed to donate" });
+  }
+}
+
+
+// ========================================
+// PAWAID FUND DONATIONS (admin only)
+// ========================================
+
+const fundDonationSchema = donationSchema.extend({
+  destinationType: z.enum(["VOLUNTEER", "RESCUE_POST"], "Choose a volunteer or a rescue post."),
+  targetId: z.uuid("Choose who to donate to."),
+})
+
+// An admin gives money from the PawAid Fund to a volunteer or a rescue post. It is
+// recorded as a donation with the fund as the donor, so it shows up in the donation
+// lists, and the ledger entry names the admin who made it (PRD §17, §18)
+export async function donateFromFund(req, res) {
+  try {
+    const parsed = fundDonationSchema.safeParse(req.body ?? {})
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { amount, destinationType, targetId } = parsed.data
+    const toPost = destinationType === "RESCUE_POST"
+
+    const donation = await prisma.$transaction(async (tx) => {
+      // throws FundShortfallError, which rolls the whole donation back
+      await debitFund(tx, amount)
+
+      let volunteer = null
+      let post = null
+
+      if (toPost) {
+        post = await tx.rescuePost.findUnique({ where: { id: targetId }, select: { id: true } })
+        if (!post) throw new PostDonationError("Rescue post not found", 404)
+        post = await addToPost(tx, post.id, amount)
+        volunteer = post.assignedVolunteer
+      } else {
+        volunteer = await tx.volunteerProfile.findUnique({
+          where: { id: targetId },
+          select: { id: true, status: true, user: { select: { name: true, wallet: { select: { id: true } } } } },
+        })
+        if (!volunteer?.user.wallet || volunteer.status !== "ACTIVE") {
+          throw new PostDonationError("Volunteer not found", 404)
+        }
+      }
+
+      const payment = await tx.payment.create({
+        data: { amount, method: "OTHER", status: "COMPLETED", reference: "PAWAID_FUND" },
+      })
+
+      const donation = await tx.donation.create({
+        data: {
+          rescueFundId: PAWAID_FUND_ID,
+          rescuePostId: post?.id ?? null,
+          volunteerId: volunteer?.id ?? null,
+          paymentId: payment.id,
+          amount,
+          destinationType,
+        },
+        select: donationSelect,
+      })
+
+      const transaction = await tx.financialTransaction.create({
+        data: {
+          type: "RESCUE_FUND_ALLOCATION",
+          source: "PAWAID_FUND",
+          // money for a rescue nobody has taken yet is held by the post
+          destination: volunteer ? "VOLUNTEER" : "RESCUE_POST",
+          amount,
+          // the admin who made the donation
+          relatedUserId: req.user.id,
+          relatedVolunteerId: volunteer?.id ?? null,
+          relatedPostId: post?.id ?? null,
+          paymentId: payment.id,
+          donationId: donation.id,
+          rescueFundId: PAWAID_FUND_ID,
+          status: "COMPLETED",
+          reference: post ? `PawAid Fund donation to ${post.title}` : `PawAid Fund donation to ${volunteer.user.name}`,
+        },
+      })
+
+      if (volunteer) {
+        await creditWallet(tx, {
+          walletId: volunteer.user.wallet.id,
+          amount,
+          transactionId: transaction.id,
+          reference: post ? `PawAid Fund donation for ${post.title}` : "PawAid Fund donation",
+        })
+      }
+
+      return donation
+    }, { maxWait: 10000, timeout: 20000 })
+
+    return res.status(201).json({ message: "Donation sent from the PawAid Fund", data: donation })
+  } catch (error) {
+    if (error instanceof FundShortfallError) {
+      return res.status(400).json({ message: "Not enough money in the PawAid Fund" })
+    }
+    if (error instanceof PostDonationError) {
+      return res.status(error.statusCode).json({ message: error.message })
+    }
+    console.error(error);
+    res.status(500).json({ message: "Failed to donate from the fund" });
   }
 }
