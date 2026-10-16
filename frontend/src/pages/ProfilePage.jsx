@@ -7,7 +7,7 @@ import DonationsTab from "../components/profile/DonationsTab";
 import WalletTab from "../components/profile/WalletTab";
 import AddressTab from "../components/profile/AddressTab";
 import OrdersTab from "../components/profile/OrdersTab";
-import EmptyTab from "../components/profile/EmptyTab";
+import RescuesTab from "../components/profile/RescuesTab";
 import Navbar from "../components/Navbar";
 
 
@@ -113,7 +113,7 @@ export default function ProfilePage() {
                   <WalletTab user={user} onWalletUpdated={(wallet) => setUser((prev) => ({ ...prev, wallet }))} />
                 )}
                 {activeTab === "Donations" && <DonationsTab isVolunteer={!!user.volunteerProfile} />}
-                {activeTab === "Rescues" && <EmptyTab title="Rescues" />}
+                {activeTab === "Rescues" && <RescuesTab isVolunteer={!!user.volunteerProfile} />}
                 {activeTab === "Address" && <AddressTab user={user} setUser={setUser} />}
                 {activeTab === "Orders" && <OrdersTab />}
               </div>

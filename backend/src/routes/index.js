@@ -2,7 +2,7 @@ import { Router } from "express";
 import { login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
-import { addArea, assignPost, createPost, deletePost, listAreas, listPosts, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
+import { addArea, assignPost, createPost, deletePost, listAreas, listMyPosts, listPosts, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
@@ -49,6 +49,8 @@ router.post("/add-area", requireAuth, requireAdmin, addArea)
 
 
 router.get("/rescue-post", optionalAuth, listPosts)
+// keep before the /rescue-post/:postId routes so "mine" is not treated as an id
+router.get("/rescue-post/mine", requireAuth, listMyPosts)
 router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
 router.get("/rescue-post/:postId/comments", listComments)
 router.post("/rescue-post/:postId/comments", requireAuth, createComment)

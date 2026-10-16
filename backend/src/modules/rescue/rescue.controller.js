@@ -172,6 +172,50 @@ export async function listPosts(req, res){
     }
 }
 
+// The signed in user's rescues for their profile: the posts they created, or (for
+// volunteers) the rescues they are handling. Their own taken down posts are included
+// so they can see what happened to them.
+export async function listMyPosts(req, res){
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
+        const cursor = z.uuid().safeParse(req.query.cursor)
+        const userId = req.user.id
+
+        const volunteer = await prisma.volunteerProfile.findUnique({ where: { userId }, select: { id: true } })
+        const posted = { creatorId: userId }
+        // without a volunteer profile there is nothing to handle
+        const handling = volunteer && { assignedVolunteerId: volunteer.id }
+        const where = req.query.view === "handling" ? handling : posted
+
+        const [posts, postedCount, handlingCount] = await Promise.all([
+            where
+                ? prisma.rescuePost.findMany({
+                    where,
+                    take: limit + 1,
+                    ...(cursor.success && { cursor: { id: cursor.data }, skip: 1 }),
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    include: postIncludeFor(userId),
+                })
+                : [],
+            prisma.rescuePost.count({ where: posted }),
+            volunteer ? prisma.rescuePost.count({ where: handling }) : 0,
+        ])
+
+        const hasMore = posts.length > limit
+        if (hasMore) posts.pop()
+
+        return res.json({
+            message: "Posts listed",
+            data: posts.map(withUpvoted),
+            counts: { posted: postedCount, handling: handlingCount },
+            nextCursor: hasMore ? posts[posts.length - 1].id : null
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch your rescues" });
+    }
+}
+
 export async function upvotePost(req, res){
     try {
         const postId = z.uuid().safeParse(req.params.postId)
