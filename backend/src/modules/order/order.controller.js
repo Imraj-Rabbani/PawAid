@@ -218,6 +218,57 @@ export async function createOrder(req, res) {
     }
 }
 
+// the groups the buyer's Orders tab filters by
+const MY_ORDER_GROUPS = {
+    active: ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED"],
+    delivered: ["DELIVERED"],
+    cancelled: ["CANCELLED", "REFUNDED"],
+}
+
+// The signed in user's own orders, newest first
+export async function listMyOrders(req, res) {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
+        const cursor = z.uuid().safeParse(req.query.cursor)
+        const statuses = MY_ORDER_GROUPS[req.query.status]
+        const buyerId = req.user.id
+
+        const [orders, byStatus] = await Promise.all([
+            prisma.order.findMany({
+                where: { buyerId, ...(statuses && { status: { in: statuses } }) },
+                select: orderSelect,
+                // one extra row tells us whether there is another page
+                take: limit + 1,
+                ...(cursor.success && { cursor: { id: cursor.data }, skip: 1 }),
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            }),
+            prisma.order.groupBy({ by: ["status"], where: { buyerId }, _count: true }),
+        ])
+
+        const hasMore = orders.length > limit
+        if (hasMore) orders.pop()
+
+        const countOf = (group) => byStatus
+            .filter((row) => MY_ORDER_GROUPS[group].includes(row.status))
+            .reduce((sum, row) => sum + row._count, 0)
+
+        return res.json({
+            message: "Orders listed",
+            data: orders,
+            counts: {
+                all: byStatus.reduce((sum, row) => sum + row._count, 0),
+                active: countOf("active"),
+                delivered: countOf("delivered"),
+                cancelled: countOf("cancelled"),
+            },
+            nextCursor: hasMore ? orders[orders.length - 1].id : null,
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch your orders" });
+    }
+}
+
 export async function getOrder(req, res) {
     try {
         const orderId = z.uuid().safeParse(req.params.orderId)

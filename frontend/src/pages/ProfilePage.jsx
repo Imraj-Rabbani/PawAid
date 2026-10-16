@@ -6,6 +6,7 @@ import ProfileTab from "../components/profile/ProfileTab";
 import DonationsTab from "../components/profile/DonationsTab";
 import WalletTab from "../components/profile/WalletTab";
 import AddressTab from "../components/profile/AddressTab";
+import OrdersTab from "../components/profile/OrdersTab";
 import EmptyTab from "../components/profile/EmptyTab";
 import Navbar from "../components/Navbar";
 
@@ -114,7 +115,7 @@ export default function ProfilePage() {
                 {activeTab === "Donations" && <DonationsTab isVolunteer={!!user.volunteerProfile} />}
                 {activeTab === "Rescues" && <EmptyTab title="Rescues" />}
                 {activeTab === "Address" && <AddressTab user={user} setUser={setUser} />}
-                {activeTab === "Orders" && <EmptyTab title="Orders" />}
+                {activeTab === "Orders" && <OrdersTab />}
               </div>
             </main>
           </div>
