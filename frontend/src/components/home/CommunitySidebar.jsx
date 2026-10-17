@@ -92,6 +92,14 @@ export default function CommunitySidebar({ summary, user }) {
             })}
           </div>
         )}
+
+        <Link
+          to="/volunteers"
+          className="py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-xs font-semibold text-secondary flex items-center justify-center gap-1.5 transition"
+        >
+          View All Volunteers
+          <Icon name="arrow_forward" className="text-[16px]" />
+        </Link>
       </Card>
 
       {/* ── Volunteers to discover ── */}
