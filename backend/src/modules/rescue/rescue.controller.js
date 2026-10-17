@@ -28,7 +28,7 @@ const postInclude = {
             user: { select: { id: true, name: true, profilePictureUrl: true } },
         },
     },
-    _count: { select: { comments: true, upvotes: true } },
+    _count: { select: { comments: true, upvotes: true, updates: true } },
 };
 
 // Adds the viewer's own upvote (if any) so we can tell them whether they upvoted
@@ -446,6 +446,119 @@ export async function updatePostProgress(req, res){
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to update rescue" });
+    }
+}
+
+// ========================================
+// RESCUE UPDATES
+// ========================================
+
+// the volunteer can keep posting after the rescue too, e.g. how the animal is recovering
+const UPDATABLE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "RESOLVED"]
+
+const rescueUpdateSchema = z.object({
+    note: z.string().trim().max(1000, "Update is too long.").default(""),
+})
+
+const rescueUpdateSelect = {
+    id: true,
+    note: true,
+    createdAt: true,
+    images: { select: { id: true, imageUrl: true } },
+    volunteer: { select: { id: true, user: { select: { id: true, name: true, profilePictureUrl: true } } } },
+}
+
+// Anyone can follow a rescue's updates, newest first
+export async function listRescueUpdates(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
+        const cursor = z.uuid().safeParse(req.query.cursor)
+
+        // one extra row tells us whether there is more
+        const updates = await prisma.rescueUpdate.findMany({
+            where: { rescuePostId: postId.data },
+            take: limit + 1,
+            ...(cursor.success && { cursor: { id: cursor.data }, skip: 1 }),
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: rescueUpdateSelect,
+        })
+
+        const hasMore = updates.length > limit
+        if (hasMore) updates.pop()
+
+        return res.json({
+            message: "Updates listed",
+            data: updates,
+            nextCursor: hasMore ? updates[updates.length - 1].id : null
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch updates" });
+    }
+}
+
+// The volunteer handling a rescue posts an update: a note, photos, or both
+export async function createRescueUpdate(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const parsed = rescueUpdateSchema.safeParse(req.body ?? {})
+        if (!parsed.success) {
+            return res.status(400).json({
+                message: "Validation failed",
+                errors: parsed.error.flatten().fieldErrors,
+            });
+        }
+
+        const { note } = parsed.data
+        const files = req.files ?? []
+        if (!note && files.length === 0) {
+            return res.status(400).json({ message: "Write an update or add a photo" })
+        }
+
+        const post = await prisma.rescuePost.findUnique({
+            where: { id: postId.data },
+            select: { id: true, status: true, assignedVolunteerId: true },
+        })
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+        if (post.assignedVolunteerId !== req.volunteer.id) {
+            return res.status(403).json({ message: "Only the volunteer handling this rescue can post updates" })
+        }
+        if (!UPDATABLE_STATUSES.includes(post.status)) {
+            return res.status(409).json({ message: "This rescue is no longer taking updates" })
+        }
+
+        // checked above first so a rejected request doesn't upload anything
+        const imageUrls = await Promise.all(files.map((file, index) => uploadToR2(
+            file.buffer,
+            `rescue-updates/${post.id}-${Date.now()}-${index}.${file.mimetype.split("/")[1]}`,
+            file.mimetype
+        )))
+
+        const update = await prisma.rescueUpdate.create({
+            data: {
+                rescuePostId: post.id,
+                volunteerId: req.volunteer.id,
+                note,
+                images: { create: imageUrls.map((imageUrl) => ({ imageUrl })) },
+            },
+            select: rescueUpdateSelect,
+        })
+
+        return res.status(201).json({ message: "Update posted", data: update })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to post update" });
     }
 }
 

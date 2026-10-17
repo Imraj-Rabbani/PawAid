@@ -163,6 +163,7 @@ model VolunteerProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])
   assignedPosts RescuePost[] @relation("AssignedVolunteer")
+  rescueUpdates RescueUpdate[]
   donations Donation[]
   expenses RescueExpense[]
   financialTransactions FinancialTransaction[] @relation("RelatedVolunteer")
@@ -192,6 +193,7 @@ model RescuePost {
   rescueArea RescueArea @relation(fields: [rescueAreaId], references: [id])
   assignedVolunteer VolunteerProfile? @relation("AssignedVolunteer", fields: [assignedVolunteerId], references: [id])
   images RescuePostImage[]
+  updates RescueUpdate[]
   comments Comment[]
   reports PostReport[]
   upvotes PostUpvote[]
@@ -215,6 +217,34 @@ model RescuePostImage {
   rescuePost RescuePost @relation(fields: [rescuePostId], references: [id], onDelete: Cascade)
   @@index([rescuePostId])
   @@map("rescue_post_images")
+}
+
+// ========================================
+// RESCUE UPDATE
+// ========================================
+
+// A progress update the volunteer handling a rescue posts for its followers
+model RescueUpdate {
+  id String @id @default(uuid()) @db.Uuid
+  rescuePostId String @map("rescue_post_id") @db.Uuid
+  volunteerId String @map("volunteer_id") @db.Uuid
+  note String
+  createdAt DateTime @default(now()) @map("created_at")
+  rescuePost RescuePost @relation(fields: [rescuePostId], references: [id], onDelete: Cascade)
+  volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id])
+  images RescueUpdateImage[]
+  @@index([rescuePostId, createdAt])
+  @@index([volunteerId])
+  @@map("rescue_updates")
+}
+
+model RescueUpdateImage {
+  id String @id @default(uuid()) @db.Uuid
+  rescueUpdateId String @map("rescue_update_id") @db.Uuid
+  imageUrl String @map("image_url")
+  rescueUpdate RescueUpdate @relation(fields: [rescueUpdateId], references: [id], onDelete: Cascade)
+  @@index([rescueUpdateId])
+  @@map("rescue_update_images")
 }
 
 // ========================================

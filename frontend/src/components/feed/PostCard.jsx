@@ -7,6 +7,7 @@ import DonatePostModal from "./DonatePostModal";
 import EditPostModal from "./EditPostModal";
 import ResolveRescueModal from "./ResolveRescueModal";
 import ImageLightbox from "./ImageLightbox";
+import RescueUpdates from "./RescueUpdates";
 import Icon from "../Icon";
 
 const STATUS = {
@@ -20,6 +21,8 @@ const STATUS = {
 
 // keep in sync with DONATABLE_STATUSES in backend/src/modules/donation/donation.controller.js
 const DONATABLE_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS"];
+// keep in sync with UPDATABLE_STATUSES in backend/src/modules/rescue/rescue.controller.js
+const UPDATABLE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "RESOLVED"];
 
 const MAX_IMAGES_SHOWN = 4;
 const LONG_DESCRIPTION = 280;
@@ -47,6 +50,10 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const [assigning, setAssigning] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments ?? 0);
+  const [showUpdates, setShowUpdates] = useState(false);
+  // set when the volunteer opens updates to write one, so the box gets focus
+  const [composing, setComposing] = useState(false);
+  const [updateCount, setUpdateCount] = useState(post._count?.updates ?? 0);
   const [upvoted, setUpvoted] = useState(Boolean(post.upvoted));
   const [upvoteCount, setUpvoteCount] = useState(post._count?.upvotes ?? 0);
   const [upvoting, setUpvoting] = useState(false);
@@ -80,6 +87,8 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
   // the volunteer on the rescue moves it forward; the server re-checks they're still active
   const canStart = handlingIt && assignment.status === "ASSIGNED";
   const canResolve = handlingIt && ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status);
+  // the server re-checks they're the active volunteer on it
+  const canPostUpdate = handlingIt && UPDATABLE_STATUSES.includes(assignment.status);
   // creators can change their post until a volunteer takes it on
   const canEdit = isOwnPost && assignment.status === "OPEN" && !assignedVolunteer;
   // fundraising rescues take donations on the post, before or after a volunteer takes them
@@ -387,8 +396,20 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
 
       {/* ── Actions ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {(canAssign || canDonate || canDonateToVolunteer || canStart || canResolve) && (
+        {(canAssign || canDonate || canDonateToVolunteer || canStart || canResolve || canPostUpdate) && (
           <div className="flex flex-wrap items-center gap-2">
+            {canPostUpdate && (
+              <button
+                onClick={() => {
+                  setComposing(true);
+                  setShowUpdates(true);
+                }}
+                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2"
+              >
+                <Icon name="edit_note" className="text-[18px]" />
+                Post Update
+              </button>
+            )}
             {canStart && (
               <button
                 onClick={startRescue}
@@ -463,6 +484,29 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
             {upvoteCount}
           </button>
 
+          {(updateCount > 0 || canPostUpdate) && (
+            <button
+              onClick={() => {
+                setComposing(false);
+                setShowUpdates((v) => !v);
+              }}
+              aria-expanded={showUpdates}
+              aria-label={`Rescue updates (${updateCount})`}
+              title="Rescue updates"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-container-low transition ${
+                showUpdates ? "text-secondary" : "hover:text-on-surface"
+              }`}
+            >
+              <Icon name="campaign" filled={showUpdates} className="text-[18px]" />
+              Updates
+              {updateCount > 0 && (
+                <span className="min-w-4.5 px-1 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
+                  {updateCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={() => setShowComments((v) => !v)}
             aria-expanded={showComments}
@@ -512,6 +556,17 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
         </div>
       </div>
 
+      {showUpdates && (
+        <div className={`-mx-4 sm:-mx-6 ${showComments ? "" : "-mb-4 sm:-mb-6"}`}>
+          <RescueUpdates
+            postId={post.id}
+            canPost={canPostUpdate}
+            focusComposer={composing}
+            timeAgo={timeAgo}
+            onCountChange={(delta) => setUpdateCount((n) => n + delta)}
+          />
+        </div>
+      )}
       {showComments && (
         <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
           <CommentSection
