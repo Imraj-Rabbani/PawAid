@@ -14,6 +14,7 @@ import ProductPage from "./pages/ProductPage"
 import CartPage from "./pages/CartPage"
 import CheckoutPage from "./pages/CheckoutPage"
 import OrderPage from "./pages/OrderPage"
+import RescuePostPage from "./pages/RescuePostPage"
 import NotFound from "./pages/NotFound"
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
     <>
       <Routes>
         <Route path="/" element={<Homepage/>} />
+        <Route path="/rescue/:postId" element={<RescuePostPage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/volunteers" element={<VolunteersPage />} />
         <Route path="/volunteers/:volunteerId" element={<VolunteerProfilePage />} />

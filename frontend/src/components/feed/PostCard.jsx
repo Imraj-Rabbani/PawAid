@@ -5,38 +5,15 @@ import CommentSection from "./CommentSection";
 import ReportPostModal from "./ReportPostModal";
 import DonatePostModal from "./DonatePostModal";
 import EditPostModal from "./EditPostModal";
-import ResolveRescueModal from "./ResolveRescueModal";
 import ImageLightbox from "./ImageLightbox";
-import RescueUpdates from "./RescueUpdates";
 import Icon from "../Icon";
-
-const STATUS = {
-  OPEN: { label: "Awaiting Volunteer", className: "bg-error-container text-on-error-container" },
-  ASSIGNED: { label: "Assigned", className: "bg-secondary-container text-on-secondary-container" },
-  IN_PROGRESS: { label: "In Progress", className: "bg-secondary-container text-on-secondary-container" },
-  RESOLVED: { label: "Rescued", className: "bg-secondary-container text-on-secondary-container" },
-  CLOSED: { label: "Closed", className: "bg-surface-container-high text-on-surface-variant" },
-  CANCELLED: { label: "Cancelled", className: "bg-surface-container-high text-on-surface-variant" },
-};
-
-// keep in sync with DONATABLE_STATUSES in backend/src/modules/donation/donation.controller.js
-const DONATABLE_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS"];
-// keep in sync with UPDATABLE_STATUSES in backend/src/modules/rescue/rescue.controller.js
-const UPDATABLE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "RESOLVED"];
+import { STATUS, DONATABLE_STATUSES, timeAgo, useUpvote } from "./rescueUtils";
 
 const MAX_IMAGES_SHOWN = 4;
 const LONG_DESCRIPTION = 280;
 
-function timeAgo(date) {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-
-  if (seconds < 60) return "Just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(date).toLocaleDateString();
-}
-
+// A rescue in the feed. Everything about it, and the volunteer's tools for it,
+// live on its own page (RescuePostPage), which the card links to.
 export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const [expanded, setExpanded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -50,23 +27,15 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const [assigning, setAssigning] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments ?? 0);
-  const [showUpdates, setShowUpdates] = useState(false);
-  // set when the volunteer opens updates to write one, so the box gets focus
-  const [composing, setComposing] = useState(false);
-  const [updateCount, setUpdateCount] = useState(post._count?.updates ?? 0);
-  const [upvoted, setUpvoted] = useState(Boolean(post.upvoted));
-  const [upvoteCount, setUpvoteCount] = useState(post._count?.upvotes ?? 0);
-  const [upvoting, setUpvoting] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reported, setReported] = useState(false);
   const [raised, setRaised] = useState(post.donationReceived);
   const [showDonate, setShowDonate] = useState(false);
   const [thanks, setThanks] = useState("");
   const [showEdit, setShowEdit] = useState(false);
-  const [showResolve, setShowResolve] = useState(false);
-  const [progressing, setProgressing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  const { upvoted, count: upvoteCount, toggle: toggleUpvote } = useUpvote(post, user, () => navigate("/signin"));
 
   const { creator, rescueArea, images } = post;
   const status = STATUS[assignment.status] || STATUS.OPEN;
@@ -84,11 +53,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const isOwnPost = user?.id === creator.id;
   const fullyFunded = progress >= 100;
   const handlingIt = assignedVolunteer && assignedVolunteer.user.id === user?.id;
-  // the volunteer on the rescue moves it forward; the server re-checks they're still active
-  const canStart = handlingIt && assignment.status === "ASSIGNED";
-  const canResolve = handlingIt && ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status);
-  // the server re-checks they're the active volunteer on it
-  const canPostUpdate = handlingIt && UPDATABLE_STATUSES.includes(assignment.status);
   // creators can change their post until a volunteer takes it on
   const canEdit = isOwnPost && assignment.status === "OPEN" && !assignedVolunteer;
   // fundraising rescues take donations on the post, before or after a volunteer takes them
@@ -96,35 +60,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
     post.donationTarget > 0 && DONATABLE_STATUSES.includes(assignment.status) && !isOwnPost && !handlingIt;
   // a rescue without a target can still be supported through its volunteer
   const canDonateToVolunteer = !canDonate && assignedVolunteer && !handlingIt && !post.donationTarget;
-
-  const toggleUpvote = async () => {
-    if (!user) {
-      navigate("/signin");
-      return;
-    }
-    if (upvoting) return;
-
-    // update right away, then settle on the count the server returns
-    const next = !upvoted;
-    setUpvoted(next);
-    setUpvoteCount((n) => n + (next ? 1 : -1));
-
-    try {
-      setUpvoting(true);
-      const res = next
-        ? await api.post(`/rescue-post/${post.id}/upvote`)
-        : await api.delete(`/rescue-post/${post.id}/upvote`);
-      setUpvoted(res.data.data.upvoted);
-      setUpvoteCount(res.data.data.upvoteCount);
-    } catch (err) {
-      console.error(err);
-      setUpvoted(!next);
-      setUpvoteCount((n) => n + (next ? -1 : 1));
-      alert(err.response?.data?.message || "Failed to update upvote");
-    } finally {
-      setUpvoting(false);
-    }
-  };
 
   const assignToMe = async () => {
     if (!confirm("Take responsibility for this rescue? Any donations it has raised will move to your wallet.")) {
@@ -134,10 +69,7 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
     try {
       setAssigning(true);
       const res = await api.post(`/rescue-post/${post.id}/assign`);
-      setAssignment({
-        status: res.data.data.status,
-        assignedVolunteer: res.data.data.assignedVolunteer,
-      });
+      applyUpdate(res.data.data);
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Failed to assign rescue");
@@ -150,19 +82,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
   const applyUpdate = (updated) => {
     setAssignment({ status: updated.status, assignedVolunteer: updated.assignedVolunteer });
     onUpdated?.(updated);
-  };
-
-  const startRescue = async () => {
-    try {
-      setProgressing(true);
-      const res = await api.patch(`/rescue-post/${post.id}/progress`, { status: "IN_PROGRESS" });
-      applyUpdate(res.data.data);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to update rescue");
-    } finally {
-      setProgressing(false);
-    }
   };
 
   const deletePost = async () => {
@@ -255,7 +174,11 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
 
       {/* ── Body ── */}
       <div>
-        <h3 className="font-display text-xl font-semibold text-on-surface wrap-break-word">{post.title}</h3>
+        <h3 className="font-display text-xl font-semibold text-on-surface wrap-break-word">
+          <Link to={`/rescue/${post.id}`} className="hover:text-primary">
+            {post.title}
+          </Link>
+        </h3>
         <p
           className={`mt-2 text-[15px] leading-relaxed text-on-surface-variant whitespace-pre-wrap wrap-break-word ${
             isLong && !expanded ? "line-clamp-4" : ""
@@ -395,73 +318,46 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
       )}
 
       {/* ── Actions ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {(canAssign || canDonate || canDonateToVolunteer || canStart || canResolve || canPostUpdate) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {canPostUpdate && (
-              <button
-                onClick={() => {
-                  setComposing(true);
-                  setShowUpdates(true);
-                }}
-                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2"
-              >
-                <Icon name="edit_note" className="text-[18px]" />
-                Post Update
-              </button>
-            )}
-            {canStart && (
-              <button
-                onClick={startRescue}
-                disabled={progressing}
-                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Icon name="directions_run" className="text-[18px]" />
-                {progressing ? "Updating..." : "Start Rescue"}
-              </button>
-            )}
-            {canResolve && (
-              <button
-                onClick={() => setShowResolve(true)}
-                disabled={progressing}
-                className="flex-1 sm:flex-none bg-secondary hover:opacity-90 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Icon name="check_circle" className="text-[18px]" />
-                Mark Rescued
-              </button>
-            )}
-            {canDonate && (
-              <button
-                onClick={openDonate}
-                className="flex-1 sm:flex-none bg-primary hover:bg-primary-container text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2"
-              >
-                <Icon name="volunteer_activism" className="text-[18px]" />
-                Donate
-              </button>
-            )}
-            {canDonateToVolunteer && (
-              <Link
-                to={`/volunteers/${assignedVolunteer.id}`}
-                className="flex-1 sm:flex-none bg-primary hover:bg-primary-container text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm transition flex items-center justify-center gap-2"
-              >
-                <Icon name="volunteer_activism" className="text-[18px]" />
-                Donate to {assignedVolunteer.user.name.split(" ")[0]}
-              </Link>
-            )}
-            {canAssign && (
-              <button
-                onClick={assignToMe}
-                disabled={assigning}
-                className="flex-1 sm:flex-none bg-surface-container-low hover:bg-surface-container-high text-secondary px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Icon name="handshake" className="text-[18px]" />
-                {assigning ? "Claiming..." : "Claim Case as Volunteer"}
-              </button>
-            )}
-          </div>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {canDonate && (
+            <button
+              onClick={openDonate}
+              className="bg-primary hover:bg-primary-container text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1"
+            >
+              <Icon name="volunteer_activism" className="text-[18px]" />
+              Donate
+            </button>
+          )}
+          {canDonateToVolunteer && (
+            <Link
+              to={`/volunteers/${assignedVolunteer.id}`}
+              className="bg-primary hover:bg-primary-container text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1"
+            >
+              <Icon name="volunteer_activism" className="text-[18px]" />
+              Donate to {assignedVolunteer.user.name.split(" ")[0]}
+            </Link>
+          )}
+          {canAssign && (
+            <button
+              onClick={assignToMe}
+              disabled={assigning}
+              className="bg-surface-container-low hover:bg-surface-container-high text-secondary px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              <Icon name="handshake" className="text-[18px]" />
+              {assigning ? "Claiming..." : "Claim Case as Volunteer"}
+            </button>
+          )}
+          <Link
+            to={`/rescue/${post.id}`}
+            className="bg-surface-container-low hover:bg-surface-container-high text-on-surface px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1"
+          >
+            <Icon name={handlingIt ? "manage_history" : "open_in_full"} className="text-[18px]" />
+            {handlingIt ? "Manage Rescue" : "View Rescue"}
+          </Link>
+        </div>
 
-        <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant sm:ml-auto self-end sm:self-center">
+        <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant ml-auto">
           <button
             onClick={toggleUpvote}
             aria-pressed={upvoted}
@@ -483,29 +379,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
             </svg>
             {upvoteCount}
           </button>
-
-          {(updateCount > 0 || canPostUpdate) && (
-            <button
-              onClick={() => {
-                setComposing(false);
-                setShowUpdates((v) => !v);
-              }}
-              aria-expanded={showUpdates}
-              aria-label={`Rescue updates (${updateCount})`}
-              title="Rescue updates"
-              className={`flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-container-low transition ${
-                showUpdates ? "text-secondary" : "hover:text-on-surface"
-              }`}
-            >
-              <Icon name="campaign" filled={showUpdates} className="text-[18px]" />
-              Updates
-              {updateCount > 0 && (
-                <span className="min-w-4.5 px-1 rounded-full bg-secondary-container text-on-secondary-container text-[11px] font-bold">
-                  {updateCount}
-                </span>
-              )}
-            </button>
-          )}
 
           <button
             onClick={() => setShowComments((v) => !v)}
@@ -556,17 +429,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
         </div>
       </div>
 
-      {showUpdates && (
-        <div className={`-mx-4 sm:-mx-6 ${showComments ? "" : "-mb-4 sm:-mb-6"}`}>
-          <RescueUpdates
-            postId={post.id}
-            canPost={canPostUpdate}
-            focusComposer={composing}
-            timeAgo={timeAgo}
-            onCountChange={(delta) => setUpdateCount((n) => n + delta)}
-          />
-        </div>
-      )}
       {showComments && (
         <div className="-mx-4 sm:-mx-6 -mb-4 sm:-mb-6">
           <CommentSection
@@ -584,16 +446,6 @@ export default function PostCard({ post, user, onUpdated, onDeleted }) {
           onClose={() => setShowEdit(false)}
           onSaved={(updated) => {
             setShowEdit(false);
-            applyUpdate(updated);
-          }}
-        />
-      )}
-      {showResolve && (
-        <ResolveRescueModal
-          post={post}
-          onClose={() => setShowResolve(false)}
-          onResolved={(updated) => {
-            setShowResolve(false);
             applyUpdate(updated);
           }}
         />

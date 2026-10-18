@@ -28,7 +28,7 @@ const postInclude = {
             user: { select: { id: true, name: true, profilePictureUrl: true } },
         },
     },
-    _count: { select: { comments: true, upvotes: true, updates: true } },
+    _count: { select: { comments: true, upvotes: true, updates: true, expenses: true } },
 };
 
 // Adds the viewer's own upvote (if any) so we can tell them whether they upvoted
@@ -169,6 +169,37 @@ export async function listPosts(req, res){
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to fetch posts" });
+    }
+}
+
+// One rescue for its own page. A taken down post stays visible to its creator
+// and admins, the same people who can see it in their lists.
+export async function getPost(req, res){
+    try {
+        const postId = z.uuid().safeParse(req.params.postId)
+        if (!postId.success) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        const post = await prisma.rescuePost.findUnique({
+            where: { id: postId.data },
+            include: postIncludeFor(req.user?.id),
+        })
+        const canSeeRemoved = post && (post.creatorId === req.user?.id || req.user?.role === "ADMIN")
+        if (!post || (post.status === "CANCELLED" && !canSeeRemoved)) {
+            return res.status(404).json({ message: "Post not found" })
+        }
+
+        // how many people gave, never who they are
+        const donors = await prisma.donation.groupBy({
+            by: ["donorId"],
+            where: { rescuePostId: post.id, donorId: { not: null } },
+        })
+
+        return res.json({ message: "Post found", data: { ...withUpvoted(post), donorCount: donors.length } })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch post" });
     }
 }
 

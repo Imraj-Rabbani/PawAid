@@ -2,7 +2,7 @@ import { Router } from "express";
 import { login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
-import { addArea, assignPost, createPost, createRescueUpdate, deletePost, listAreas, listMyPosts, listPosts, listRescueUpdates, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
+import { addArea, assignPost, createPost, createRescueUpdate, deletePost, getPost, listAreas, listMyPosts, listPosts, listRescueUpdates, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
 import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/user/user.controller.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
@@ -20,6 +20,7 @@ import { transparencyOverview } from "../modules/transparency/transparency.contr
 import { reportPost } from "../modules/report/report.controller.js";
 import { getProduct, listMarketplaceCategories, listProducts } from "../modules/marketplace/marketplace.controller.js";
 import { createOrder, getOrder, listMyOrders } from "../modules/order/order.controller.js";
+import { createExpense, deleteExpense, listExpenses } from "../modules/expense/expense.controller.js";
 
 const router = Router()
 
@@ -52,6 +53,7 @@ router.get("/rescue-post", optionalAuth, listPosts)
 // keep before the /rescue-post/:postId routes so "mine" is not treated as an id
 router.get("/rescue-post/mine", requireAuth, listMyPosts)
 router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
+router.get("/rescue-post/:postId", optionalAuth, getPost)
 router.get("/rescue-post/:postId/comments", listComments)
 router.post("/rescue-post/:postId/comments", requireAuth, createComment)
 router.delete("/comments/:commentId", requireAuth, deleteComment)
@@ -61,6 +63,9 @@ router.post("/rescue-post/:postId/report", requireAuth, reportPost)
 router.post("/rescue-post/:postId/assign", requireAuth, requireActiveVolunteer, assignPost)
 router.get("/rescue-post/:postId/updates", listRescueUpdates)
 router.post("/rescue-post/:postId/updates", requireAuth, requireActiveVolunteer, upload.array("images", 4), createRescueUpdate)
+router.get("/rescue-post/:postId/expenses", listExpenses)
+router.post("/rescue-post/:postId/expenses", requireAuth, requireActiveVolunteer, upload.single("receipt"), createExpense)
+router.delete("/expenses/:expenseId", requireAuth, requireActiveVolunteer, deleteExpense)
 router.patch("/rescue-post/:postId/progress", requireAuth, requireActiveVolunteer, upload.single("photo"), updatePostProgress)
 router.put("/rescue-post/:postId", requireAuth, updatePost)
 router.delete("/rescue-post/:postId", requireAuth, deletePost)

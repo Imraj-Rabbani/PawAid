@@ -163,6 +163,10 @@ function Overview({ data, onFundChange }) {
             <Row label="Being handled by a volunteer" value={rescues.inProgress.toLocaleString()} />
             <Row label="Rescued" value={rescues.rescued.toLocaleString()} strong />
             <Row label="Rescues that received donations" value={rescues.funded.toLocaleString()} />
+            <Row
+              label={`Spent on rescues, with receipts (${rescues.expenseCount.toLocaleString()} ${rescues.expenseCount === 1 ? "expense" : "expenses"})`}
+              value={taka(rescues.documentedExpenses)}
+            />
           </Rows>
         </Panel>
       </div>

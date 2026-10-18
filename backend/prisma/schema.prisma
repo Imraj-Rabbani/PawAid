@@ -416,6 +416,7 @@ model Order {
   payment Payment @relation(fields: [paymentId], references: [id])
   items OrderItem[]
   financialTransaction FinancialTransaction?
+  rescueExpenses RescueExpense[]
 
   @@index([buyerId])
   @@map("orders")
@@ -516,19 +517,25 @@ model RescueFund {
 // RESCUE EXPENSE
 // ========================================
 
+// What a volunteer spent on a rescue (PRD §21). Documentation only: no money
+// moves here. Backed by a receipt photo, a marketplace order, or both.
 model RescueExpense {
   id String @id @default(uuid()) @db.Uuid
   volunteerId String @map("volunteer_id") @db.Uuid
   rescuePostId String @map("rescue_post_id") @db.Uuid
-  rescueFundId String @map("rescue_fund_id") @db.Uuid
+  rescueFundId String? @map("rescue_fund_id") @db.Uuid
+  orderId String? @map("order_id") @db.Uuid
   amount Int
   description String
+  receiptUrl String? @map("receipt_url")
   createdAt DateTime @default(now()) @map("created_at")
   volunteer VolunteerProfile @relation(fields: [volunteerId], references: [id])
   rescuePost RescuePost @relation(fields: [rescuePostId], references: [id])
-  rescueFund RescueFund @relation(fields: [rescueFundId], references: [id])
+  rescueFund RescueFund? @relation(fields: [rescueFundId], references: [id], onDelete: Restrict)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Restrict)
   @@index([volunteerId])
-  @@index([rescuePostId])
+  @@index([rescuePostId, createdAt])
   @@index([rescueFundId])
+  @@index([orderId])
   @@map("rescue_expenses")
 }

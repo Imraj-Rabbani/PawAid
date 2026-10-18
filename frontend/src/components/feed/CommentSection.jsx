@@ -1,84 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import api from "../../services/api";
+import useComments from "./useComments";
 
 const MAX_COMMENT_LENGTH = 1000;
 
 export default function CommentSection({ postId, user, timeAgo, onCountChange }) {
-  // kept newest first, the same order the API pages through them
-  const [comments, setComments] = useState([]);
-  const [nextCursor, setNextCursor] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
+  const { comments, nextCursor, loading, loadingMore, error, posting, loadMore, addComment, deleteComment } =
+    useComments(postId, onCountChange);
   const [text, setText] = useState("");
-  const [posting, setPosting] = useState(false);
-
-  useEffect(() => {
-    const fetchComments = async () => {
-      try {
-        const res = await api.get(`/rescue-post/${postId}/comments`);
-        setComments(res.data.data);
-        setNextCursor(res.data.nextCursor);
-      } catch (err) {
-        console.error(err);
-        setError(err.response?.data?.message || "Failed to load comments");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchComments();
-  }, [postId]);
-
-  const loadMore = async () => {
-    try {
-      setLoadingMore(true);
-      const res = await api.get(`/rescue-post/${postId}/comments`, {
-        params: { cursor: nextCursor },
-      });
-      // a comment added since the last fetch can come back again, skip those
-      setComments((prev) => {
-        const seen = new Set(prev.map((comment) => comment.id));
-        return [...prev, ...res.data.data.filter((comment) => !seen.has(comment.id))];
-      });
-      setNextCursor(res.data.nextCursor);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to load more comments");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!text.trim() || posting) return;
-
-    try {
-      setPosting(true);
-      const res = await api.post(`/rescue-post/${postId}/comments`, { text });
-      setComments((prev) => [res.data.data, ...prev]);
-      setText("");
-      onCountChange(1);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.errors?.text?.[0] || err.response?.data?.message || "Failed to add comment");
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const handleDelete = async (commentId) => {
-    if (!confirm("Delete this comment?")) return;
-
-    try {
-      await api.delete(`/comments/${commentId}`);
-      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
-      onCountChange(-1);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to delete comment");
-    }
+    if (await addComment(text)) setText("");
   };
 
   // show oldest at the top, like a conversation
@@ -134,7 +67,7 @@ export default function CommentSection({ postId, user, timeAgo, onCountChange })
                     <span>{timeAgo(comment.createdAt)}</span>
                     {canDelete && (
                       <button
-                        onClick={() => handleDelete(comment.id)}
+                        onClick={() => deleteComment(comment.id)}
                         className="font-medium hover:text-red-600"
                       >
                         Delete

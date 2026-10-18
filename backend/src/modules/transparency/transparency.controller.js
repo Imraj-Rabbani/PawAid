@@ -16,7 +16,7 @@ export async function transparencyOverview(req, res) {
     const [
       donations, monthDonations, donationsByDestination, donors, topUps,
       movedFromRescues, heldForRescues, volunteerWallets, activeVolunteers,
-      postsByStatus, fundedRescues,
+      postsByStatus, fundedRescues, expenses,
       products, revenue, refunds, profit, fundGiven, fundByDestination, fundRecent,
     ] = await Promise.all([
       prisma.financialTransaction.aggregate({ where: { ...completed, type: "DONATION" }, _sum: { amount: true }, _count: true }),
@@ -40,6 +40,8 @@ export async function transparencyOverview(req, res) {
       prisma.volunteerProfile.count({ where: { status: "ACTIVE", user: { status: "ACTIVE" } } }),
       prisma.rescuePost.groupBy({ by: ["status"], where: { status: { not: "CANCELLED" } }, _count: true }),
       prisma.rescuePost.count({ where: { donationReceived: { gt: 0 }, status: { not: "CANCELLED" } } }),
+      // what volunteers have documented spending on rescues, with receipts or orders (PRD §21)
+      prisma.rescueExpense.aggregate({ _sum: { amount: true }, _count: true }),
       prisma.product.count({ where: { active: true } }),
       prisma.financialTransaction.aggregate({ where: { ...completed, type: "ORDER_PAYMENT" }, _sum: { amount: true } }),
       // cancelled orders paid from a wallet are refunded, and stop counting as revenue
@@ -111,6 +113,8 @@ export async function transparencyOverview(req, res) {
           inProgress: postCount("ASSIGNED") + postCount("IN_PROGRESS"),
           rescued: postCount("RESOLVED"),
           funded: fundedRescues,
+          documentedExpenses: expenses._sum.amount ?? 0,
+          expenseCount: expenses._count,
         },
         marketplace: {
           live: products > 0,
