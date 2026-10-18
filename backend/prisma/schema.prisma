@@ -135,6 +135,7 @@ model User {
   donations Donation[]
   orders Order[]
   financialTransactions FinancialTransaction[] @relation("RelatedUser")
+  idempotencyKeys IdempotencyKey[]
   @@map("users")
 }
 // ========================================
@@ -538,4 +539,25 @@ model RescueExpense {
   @@index([rescueFundId])
   @@index([orderId])
   @@map("rescue_expenses")
+}
+
+// Duplicate-payment protection (PRD §39). Each money-moving request carries an
+// Idempotency-Key header; a retry with the same key gets the first response back
+// instead of charging again. See middleware/idempotency.middleware.js.
+model IdempotencyKey {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  key String
+  // method and path, so a key can't be reused on another endpoint
+  endpoint String
+  // sha256 of the request body, so a key can't be reused with different details
+  requestHash String @map("request_hash")
+  // null while the first request is still running
+  responseStatus Int? @map("response_status")
+  responseBody Json? @map("response_body")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
 }

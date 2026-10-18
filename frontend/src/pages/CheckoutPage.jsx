@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../services/idempotency";
 import Navbar from "../components/Navbar";
 import Icon from "../components/Icon";
 import { ProductImage } from "../components/marketplace/ProductCard";
@@ -89,6 +90,9 @@ function CheckoutForm({ profile, balance }) {
   const [method, setMethod] = useState(walletCovers ? "WALLET" : "CASH");
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice;
+  // a success leaves this screen, so it never needs a new one
+  const [idempotencyKey] = useIdempotencyKey();
 
   const addressChanged = delivery.address.trim() !== (profile.address || "").trim();
   const walletBlocked = method === "WALLET" && !walletCovers;
@@ -106,7 +110,7 @@ function CheckoutForm({ profile, balance }) {
         delivery,
         saveAddress: saveAddress && addressChanged,
         expectedTotal: total,
-      });
+      }, withIdempotencyKey(idempotencyKey));
       removeItems(lines.map((item) => item.productId));
       navigate(`/orders/${res.data.data.id}`, { replace: true, state: { justPlaced: true } });
     } catch (err) {

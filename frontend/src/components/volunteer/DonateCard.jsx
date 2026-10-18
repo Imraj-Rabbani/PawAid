@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 
 const QUICK_AMOUNTS = [100, 500, 1000];
 
@@ -11,6 +12,8 @@ export default function DonateCard({ volunteer, onDonated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice
+  const [idempotencyKey, renewIdempotencyKey] = useIdempotencyKey();
   const [walletBalance, setWalletBalance] = useState(null);
 
   // load the donor's balance when the form opens (only signed in users can open it),
@@ -45,7 +48,8 @@ export default function DonateCard({ volunteer, onDonated }) {
     try {
       setSaving(true);
       setError("");
-      await api.post(`/donations/volunteer/${volunteer.id}`, { amount: Number(amount) });
+      await api.post(`/donations/volunteer/${volunteer.id}`, { amount: Number(amount) }, withIdempotencyKey(idempotencyKey));
+      renewIdempotencyKey();
       setSuccess(`Thank you! You donated ৳${Number(amount).toLocaleString()} to ${volunteer.user.name}.`);
       close();
       onDonated?.();

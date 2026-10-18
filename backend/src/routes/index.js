@@ -7,6 +7,7 @@ import { updateProfilePicture, getUserProfile, updateProfile } from "../modules/
 import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
+import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import {
     createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts,
     listCategories, listOrders, listReports, listTransactions, listUsers, listVolunteers, renameArea, updateOrderStatus,
@@ -41,7 +42,7 @@ router.get("/marketplace/products", listProducts)
 router.get("/marketplace/products/:productId", getProduct)
 router.get("/marketplace/categories", listMarketplaceCategories)
 router.get("/orders", requireAuth, listMyOrders)
-router.post("/orders", requireAuth, createOrder)
+router.post("/orders", requireAuth, requireIdempotencyKey, createOrder)
 router.get("/orders/:orderId", requireAuth, getOrder)
 
 
@@ -93,7 +94,7 @@ router.post("/admin/products", upload.single("image"), createProduct)
 router.patch("/admin/products/:productId", upload.single("image"), updateProduct)
 router.get("/admin/orders", listOrders)
 router.patch("/admin/orders/:orderId/status", updateOrderStatus)
-router.post("/admin/fund/donations", donateFromFund)
+router.post("/admin/fund/donations", requireIdempotencyKey, donateFromFund)
 
 
 router.get("/volunteer", volunteers)
@@ -105,14 +106,14 @@ router.get("/volunteer/:id", volunteerById)
 
 
 router.get("/wallet/me", requireAuth, myWallet)
-router.post("/wallet/top-up", requireAuth, topUpWallet)
+router.post("/wallet/top-up", requireAuth, requireIdempotencyKey, topUpWallet)
 router.get("/wallet/transactions", requireAuth, myWalletTransactions)
-router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, transferToVolunteer)
+router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, requireIdempotencyKey, transferToVolunteer)
 
 
 router.get("/donations", listDonations)
 router.get("/donations/me", requireAuth, myDonations)
-router.post("/donations/volunteer/:volunteerId", requireAuth, donateToVolunteer)
-router.post("/donations/rescue-post/:postId", requireAuth, donateToPost)
+router.post("/donations/volunteer/:volunteerId", requireAuth, requireIdempotencyKey, donateToVolunteer)
+router.post("/donations/rescue-post/:postId", requireAuth, requireIdempotencyKey, donateToPost)
 
 export default router

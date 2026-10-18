@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 
 const MAX_MATCHES = 5;
 
@@ -14,6 +15,8 @@ export default function TransferForm({ balance, ownVolunteerId, onTransferred })
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice
+  const [idempotencyKey, renewIdempotencyKey] = useIdempotencyKey();
 
   // the public volunteer list only has active volunteers
   useEffect(() => {
@@ -62,7 +65,8 @@ export default function TransferForm({ balance, ownVolunteerId, onTransferred })
         volunteerId: recipient.id,
         amount: value,
         note: note.trim() || undefined,
-      });
+      }, withIdempotencyKey(idempotencyKey));
+      renewIdempotencyKey();
       setSuccess(res.data.message);
       close();
       onTransferred?.(res.data.data);

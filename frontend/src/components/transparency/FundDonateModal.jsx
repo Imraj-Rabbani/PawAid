@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 import Icon from "../Icon";
 import { errorMessage, taka, useDebounced } from "../admin/adminUtils";
 
@@ -26,6 +27,8 @@ export default function FundDonateModal({ balance, onClose, onDonated }) {
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice
+  const [idempotencyKey, renewIdempotencyKey] = useIdempotencyKey();
 
   const overBalance = Number(amount) > balance;
   const searchKey = `${type}|${debouncedSearch}`;
@@ -72,7 +75,12 @@ export default function FundDonateModal({ balance, onClose, onDonated }) {
     try {
       setSubmitting(true);
       setError("");
-      await api.post("/admin/fund/donations", { destinationType: type, targetId: selected.id, amount: Number(amount) });
+      await api.post(
+        "/admin/fund/donations",
+        { destinationType: type, targetId: selected.id, amount: Number(amount) },
+        withIdempotencyKey(idempotencyKey)
+      );
+      renewIdempotencyKey();
       onDonated();
     } catch (err) {
       console.error(err);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 import Icon from "../Icon";
 
 const QUICK_AMOUNTS = [100, 500, 1000];
@@ -10,6 +11,9 @@ export default function DonatePostModal({ post, user, raised, onClose, onDonated
   const [walletBalance, setWalletBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice;
+  // a success leaves this screen, so it never needs a new one
+  const [idempotencyKey] = useIdempotencyKey();
 
   const remaining = Math.max(post.donationTarget - raised, 0);
   const volunteer = post.assignedVolunteer;
@@ -48,7 +52,11 @@ export default function DonatePostModal({ post, user, raised, onClose, onDonated
     try {
       setSubmitting(true);
       setError("");
-      const res = await api.post(`/donations/rescue-post/${post.id}`, { amount: Number(amount) });
+      const res = await api.post(
+        `/donations/rescue-post/${post.id}`,
+        { amount: Number(amount) },
+        withIdempotencyKey(idempotencyKey)
+      );
       onDonated(res.data.data);
     } catch (err) {
       console.error(err);

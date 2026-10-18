@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 import Icon from "../Icon";
 import { DONATABLE_STATUSES } from "../feed/rescueUtils";
 
@@ -145,6 +146,8 @@ function DonateForm({ post, user, remaining, onDonated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [thanks, setThanks] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice
+  const [idempotencyKey, renewIdempotencyKey] = useIdempotencyKey();
 
   const value = Number(amount);
   const overBalance = walletBalance !== null && value > walletBalance;
@@ -171,7 +174,8 @@ function DonateForm({ post, user, remaining, onDonated }) {
     try {
       setSubmitting(true);
       setError("");
-      const res = await api.post(`/donations/rescue-post/${post.id}`, { amount: value });
+      const res = await api.post(`/donations/rescue-post/${post.id}`, { amount: value }, withIdempotencyKey(idempotencyKey));
+      renewIdempotencyKey();
       setWalletBalance((b) => (b === null ? b : b - value));
       setAmount("");
       setThanks(`Thank you! You donated ৳${res.data.data.donation.amount.toLocaleString()} to this rescue.`);

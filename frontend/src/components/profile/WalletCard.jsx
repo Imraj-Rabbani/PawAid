@@ -1,11 +1,14 @@
 import { useState } from "react";
 import api from "../../services/api";
+import { useIdempotencyKey, withIdempotencyKey } from "../../services/idempotency";
 
 export default function WalletCard({ wallet, canTopUp, onToppedUp }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // the same key for every try at this payment, so a retry can't charge twice
+  const [idempotencyKey, renewIdempotencyKey] = useIdempotencyKey();
 
   const close = () => {
     setOpen(false);
@@ -18,7 +21,8 @@ export default function WalletCard({ wallet, canTopUp, onToppedUp }) {
     try {
       setSaving(true);
       setError("");
-      const res = await api.post("/wallet/top-up", { amount: Number(amount) });
+      const res = await api.post("/wallet/top-up", { amount: Number(amount) }, withIdempotencyKey(idempotencyKey));
+      renewIdempotencyKey();
       onToppedUp?.(res.data.data);
       close();
     } catch (err) {

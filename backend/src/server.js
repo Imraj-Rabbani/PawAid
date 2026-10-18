@@ -2,6 +2,7 @@ import express from "express";
 import env from "./config/env.js";
 import cors from "cors"
 import routes from "./routes/index.js";
+import { cleanupIdempotencyKeys } from "./middleware/idempotency.middleware.js";
 
 const app = express();
 app.use(cors({
@@ -28,3 +29,7 @@ app.use((err, req, res, next) => {
 app.listen(env.PORT, () => {
   console.log(`Server running at http://localhost:${env.PORT}`);
 });
+
+// payment retry keys only need to live a day
+cleanupIdempotencyKeys()
+setInterval(cleanupIdempotencyKeys, 60 * 60 * 1000).unref()
