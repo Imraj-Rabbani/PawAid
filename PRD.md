@@ -1,7 +1,6 @@
 # PawAid — Product Requirements Document
 
-**Version:** 1.0  
-**Status:** Initial Product Definition  
+**Version:** 1.1  
 **Project Type:** Portfolio Project  
 **Project Name:** PawAid
 
@@ -23,11 +22,9 @@ PawAid combines four primary systems:
 3. **Donation & Wallet System**
 4. **Rescue Marketplace**
 
-The platform will also provide financial transparency. Users will be able to see aggregated information about donations, marketplace revenue, marketplace profit, rescue contributions, volunteer balances, and rescue expenditures.
+The platform also provides financial transparency. Users can see aggregated information about donations, marketplace revenue, marketplace profit, the PawAid Fund, volunteer balances, and documented rescue expenses.
 
 ---
-
-
 
 # 2. Problem Statement
 
@@ -46,11 +43,7 @@ PawAid aims to provide a centralized platform where rescue requests, volunteers,
 
 ---
 
-
-
 # 3. Product Goals
-
-
 
 ## 3.1 Primary Goals
 
@@ -59,53 +52,50 @@ PawAid aims to provide a centralized platform where rescue requests, volunteers,
 - Allow volunteers to select a rescue area.
 - Allow users to donate to rescue posts.
 - Allow users to donate directly to volunteers.
-- Give each volunteer a restricted wallet for rescue funds.
+- Give every user a wallet; a volunteer's wallet holds restricted rescue funds.
 - Allow volunteers to spend their wallet balance only through the PawAid marketplace.
 - Allow volunteers to transfer wallet funds to other volunteers.
 - Provide a marketplace for rescue-related products.
-- Allocate marketplace profit toward rescue activities.
+- Allocate marketplace profit toward rescue activities through the PawAid Fund.
+- Let volunteers show followers how a rescue is going and what its money was spent on.
 - Provide financial transparency to users.
 - Allow multiple rescue volunteers to operate on the platform.
-
-
 
 ## 3.2 Transparency Goal
 
 Users should be able to understand the flow of money at an aggregated level.
 
-Example:
-
 ```text
-Total Donations
+Wallet Top Ups
       ↓
-Volunteer / Rescue Wallets
+Donations
+      ↓
+Volunteer Wallets
       ↓
 Marketplace Purchases
       ↓
-Rescue Products
+Rescue Products  →  Documented Rescue Expenses
 ```
 
 And separately:
 
 ```text
-Marketplace Sales
+Marketplace Sales (delivered orders)
       ↓
 Product Cost
       ↓
 Marketplace Profit
       ↓
-Rescue Contribution
+PawAid Fund
       ↓
-Rescue Funding
+Donations to Volunteers / Rescue Posts
 ```
 
 ---
 
-
-
 # 4. User Roles
 
-PawAid has three primary user roles.
+PawAid has three primary user roles: `USER`, `VOLUNTEER`, `ADMIN`.
 
 ## 4.1 Admin
 
@@ -113,25 +103,20 @@ The administrator manages the rescue platform.
 
 Admin capabilities include:
 
-- Manage users
-- Manage volunteers
-- Revoke volunteer status
-- Manage rescue areas
-- Manage community posts
-- Remove inappropriate posts
+- Manage users (view, suspend, reactivate)
+- Manage volunteers (revoke, restore, view NID and wallet read-only)
+- Manage rescue areas (add, rename, delete unused areas)
+- Manage community posts (change status, take down)
 - Review reported posts
-- Manage marketplace products
+- Manage marketplace products and categories
 - Manage orders
 - View donations
 - View volunteer wallets
-- Manage rescue funding
-- Allocate rescue funds
+- View the full financial transaction ledger (read-only)
+- Donate from the PawAid Fund to volunteers or rescue posts
 - View financial reports
 
-
 ---
-
-
 
 ## 4.2 Volunteer
 
@@ -139,24 +124,25 @@ A volunteer is a registered user who participates in animal rescue activities.
 
 Volunteers can:
 
-- Select a rescue area
+- Select and change their rescue area
 - Update their profile
 - Create rescue posts
 - Assign themselves to rescue posts
+- Move their rescues through In Progress → Rescued
+- Post rescue updates (notes and photos)
+- Record rescue expenses with a receipt
 - Receive donations
 - Maintain a rescue wallet
 - Purchase rescue products using wallet funds
-- Donate wallet funds to another volunteer
-- Purchase marketplace products using personal payment
+- Transfer wallet funds to another volunteer
+- Purchase marketplace products with cash on delivery
 - View their transaction history
 
 Volunteer status can be revoked by the Admin.
 
-A revoked volunteer should no longer be able to perform volunteer-specific actions.
+A revoked volunteer can no longer perform volunteer-specific actions. Revocation changes the volunteer *profile status*, not the user's role. Every volunteer-only route checks that the profile is `ACTIVE`, so revocation takes effect on the next request.
 
 ---
-
-
 
 ## 4.3 Normal User
 
@@ -165,72 +151,64 @@ Normal users can:
 - Register and create an account
 - Browse rescue posts
 - Create rescue posts
+- Top up their wallet (simulated)
 - Donate to rescue posts
 - Donate directly to volunteers
 - Browse volunteers
 - Browse volunteers by rescue area
 - View volunteer donation information
 - Comment on posts
+- Upvote posts
 - Report posts
-- Purchase products from the marketplace
+- Purchase products from the marketplace (cash on delivery)
 - View marketplace financial information
 
 A normal user can later apply to become a volunteer.
 
 ---
 
-
-
-
 # 5. User Registration
-
-
 
 ## 5.1 Normal User Registration
 
 Minimum information:
 
 - Name
-- Email
-- Password
+- Email (stored lower-case, unique)
+- Password (at least 8 characters, hashed with bcrypt)
 
-Additional account/profile information can be collected after registration.
+A wallet with a zero balance is created for every user at sign up.
+
+Additional account information (phone, address, profile picture) can be added from the profile page after registration.
 
 ---
-
-
 
 ## 5.2 Volunteer Application
 
 A normal user can apply to become a volunteer.
 
-Required volunteer information:
+Volunteer information collected:
 
-- Name
-- Email
+- Rescue area (required)
+- NID (required, unique across volunteers)
 - Phone
 - Address
-- Profile picture
-- NID
-- Rescue area
-- Postal code
 - Personal description
+- Name, email and profile picture come from the user's account
 
-The selected rescue area will be selected from a predefined frontend dropdown.
+The rescue area is selected from a predefined dropdown.
 
-Volunteer approval is not required.
+Volunteer approval is not required. The profile is created with status `ACTIVE` and the user's role becomes `VOLUNTEER` in a single transaction.
 
-After becoming a volunteer, the user receives volunteer privileges.
+Only users with the `USER` role can apply. Admins cannot apply.
 
 The Admin can revoke the volunteer role at any time.
 
 ---
 
-
-
 # 6. Rescue Areas
 
-Rescue areas will initially be predefined by the Admin.
+Rescue areas are predefined by the Admin.
 
 Example:
 
@@ -244,33 +222,32 @@ Dhaka
 ```
 
 
-For the initial version, the frontend will use dropdown selection rather than GPS-based location selection.
+A volunteer has one active rescue area and can change it.
 
-A volunteer can have one active rescue area.
+Users can browse/filter volunteers by rescue area.
 
-Volunteers can change their selected rescue area.
-
-Users should be able to browse/filter volunteers by rescue area.
+Admins can add and rename areas. An area can only be deleted if no volunteer or rescue post uses it.
 
 ---
 
-
-
 # 7. Volunteer Profile
 
-Every volunteer will have a public profile.
+Every active volunteer has a public profile.
 
-The profile should contain:
+The profile contains:
 
 - Name
 - Profile picture
 - Description
 - Rescue area
 - Volunteer status
-- Total donations received
-- Total amount spent
+- Member since date
+- Total donations received and donation count
+- Total amount received into and spent from the wallet
 - Current available wallet balance
-- Rescue activity information
+- Recent wallet history (amounts, types and related rescue posts — **never who the money came from**)
+- Rescues handled and rescues resolved
+- The rescue posts they are handling
 
 Example:
 
@@ -300,31 +277,33 @@ Example:
 
 Users can donate directly to the volunteer from their profile.
 
+Revoked or suspended volunteers do not appear publicly.
+
+NID, phone, address and email are never included in the public profile or volunteer directory.
+
 ---
-
-
 
 # 8. Community / Rescue Posts
 
-The Community section is the central rescue coordination area.
+The Community section is the central rescue coordination area. It is the homepage feed.
 
 Both volunteers and normal users can create rescue posts.
 
 ## 8.1 Rescue Post
 
-A rescue post may contain:
+A rescue post contains:
 
-- Title
-- Description
-- Animal images
-- Rescue location/area
+- Title (3–150 characters)
+- Description (at least 10 characters)
+- Animal images (up to 5)
+- Rescue area
 - Creator
 - Creation date
-- Donation target
+- Donation target (optional; `0` means the post is not fundraising)
 - Donation amount received
 - Rescue status
 - Assigned volunteer
-- Comments
+- Comments, upvotes, updates and expenses (with counts)
 
 Example:
 
@@ -342,24 +321,43 @@ Received: ৳6,500
 Status: Awaiting Volunteer
 ```
 
+The homepage feed is paginated (cursor-based, newest first) and has filter tabs:
+
+- **All Rescues**
+- **Needs a Volunteer** — open, unassigned posts
+- **Fundraising** — posts with a target that are still active
+- **Rescued** — resolved posts
+
+Every rescue post also has its own details page (`/rescue/:postId`) with a photo gallery, donation card, volunteer card, updates, expenses and comments. The details page shows how many people donated, never who.
+
+## 8.2 Editing and Deleting a Post
+
+- A creator can edit or delete their post only while it is `OPEN` and no volunteer has taken it.
+- The donation target cannot be lowered below the amount already raised.
+- A post that has received any donation cannot be deleted, so its financial records stay intact (§26). It can only be taken down by an admin.
+
+## 8.3 Post Upvotes
+
+Signed-in users can upvote a post once and remove their upvote. The feed shows the upvote count and whether the viewer has upvoted.
+
+## 8.4 Rescue Updates
+
+The volunteer handling a rescue can post updates for its followers: a note (up to 1,000 characters), up to 4 photos, or both. Updates can be posted while the rescue is Assigned, In Progress or Rescued, so the volunteer can keep sharing recovery news after the rescue. Anyone can read them, newest first.
+
 ---
-
-
 
 # 9. Rescue Assignment
 
 A rescue post created by a normal user may initially have no assigned volunteer.
 
-Donations made to that post are stored as **unassigned rescue funds**.
-
-Example:
+Donations made to that post are held on the post as **unassigned rescue funds**.
 
 ```text
 User creates rescue post
         ↓
 Donations received
         ↓
-Unassigned Rescue Fund
+Unassigned Rescue Funds (held on the post)
         ↓
 Volunteer assigns themselves
         ↓
@@ -369,27 +367,42 @@ Funds transferred to Volunteer Wallet
 Once a volunteer assigns themselves to the rescue:
 
 - The rescue post becomes assigned.
-- The associated donation balance is transferred to that volunteer's wallet.
+- The associated donation balance is transferred to that volunteer's wallet, in the same database transaction as the assignment.
 - The volunteer becomes responsible for the rescue activity.
 
-The initial version should allow one volunteer to be assigned to a rescue post.
+Only one volunteer can be assigned to a rescue post. Only an `OPEN`, unassigned post can be claimed; if two volunteers claim at once, only one succeeds.
+
+## 9.1 Rescue Status Lifecycle
+
+The status values are:
+
+| Status | Meaning (UI label) | Who sets it |
+| --- | --- | --- |
+| `OPEN` | Awaiting volunteer | Default on creation |
+| `ASSIGNED` | A volunteer took it | Volunteer self-assignment |
+| `IN_PROGRESS` | Rescue under way | Assigned volunteer |
+| `RESOLVED` | Rescued | Assigned volunteer, with an optional closing note and photo |
+| `CLOSED` | Closed without further activity | Admin |
+| `CANCELLED` | Taken down by an admin | Admin |
+
+The assigned volunteer can move a rescue forward only: `ASSIGNED → IN_PROGRESS → RESOLVED` (or `ASSIGNED → RESOLVED`). Admins can set any status, except that `ASSIGNED`/`IN_PROGRESS` require a volunteer and a post with a volunteer cannot be reopened.
 
 ---
-
-
 
 # 10. Donations
 
 PawAid supports one-time donations.
 
+All donations are paid from the donor's PawAid wallet. Money enters the platform only through wallet top ups (simulated for now, §23). This keeps one payment path for every donation and makes the ledger simple to reconcile.
+
 There are two primary donation destinations.
 
 ## 10.1 Donation to Rescue Post
 
-Users can donate directly to a rescue post.
+Users can donate to a rescue post that has a donation target and is `OPEN`, `ASSIGNED` or `IN_PROGRESS`.
 
 ```text
-User
+Donor Wallet
  ↓
 Rescue Post
  ↓
@@ -403,70 +416,68 @@ Volunteer Wallet
 If the rescue post has already been assigned to a volunteer:
 
 ```text
-User
+Donor Wallet
  ↓
 Rescue Post
  ↓
 Assigned Volunteer Wallet
 ```
 
+The post's `donationReceived` total goes up in both cases.
+
 ---
-
-
 
 ## 10.2 Donation to Volunteer
 
-Users can donate directly from a volunteer's public profile.
+Users can donate directly from an active volunteer's public profile.
 
 ```text
-User
+Donor Wallet
  ↓
 Volunteer Profile
  ↓
 Volunteer Wallet
 ```
 
-The volunteer's total donations received should be visible publicly.
+The volunteer's total donations received are visible publicly.
 
 ---
-
-
 
 # 11. Donation Rules
 
 - Donations are one-time.
+- Donations are paid from the donor's wallet and fail if the balance is too low.
 - Donor account information is stored.
-- Donations to unassigned rescue posts remain unassigned until a volunteer takes responsibility.
+- Donations to unassigned rescue posts remain on the post until a volunteer takes responsibility.
 - Donations assigned to a volunteer become part of the volunteer's wallet.
+- A user cannot donate to themselves, to their own rescue post, or to a rescue they are handling.
+- A post cannot receive donations if its assigned volunteer has been revoked.
+- Donation amounts are whole taka, between ৳1 and ৳1,000,000.
 - Donation money cannot be withdrawn as cash.
 - Donations cannot be refunded through the initial system.
 - Volunteers can use wallet funds only within the PawAid marketplace.
 - Volunteers can transfer wallet funds to other volunteers.
 
+Users can see their own donation history (made, and for volunteers, received) on their profile. A public donations page lists recent donations across the platform.
+
 ---
 
+# 12. Wallet
 
+Every user has a wallet, created at sign up. Normal users need a wallet because donations are paid from it. A volunteer's wallet also holds the restricted rescue funds they receive.
 
-# 12. Volunteer Wallet
-
-Every volunteer has a wallet.
-
-The wallet represents restricted rescue funds.
-
-Example:
+Example (volunteer):
 
 ```text
 Volunteer Wallet
 
 Current Balance:       ৳20,000
 
-Received Donations:   ৳30,000
-Received Transfers:   ৳5,000
-Marketplace Spending: ৳15,000
-
+Total In:              ৳35,000   (donations, transfers, PawAid Fund, refunds)
+Total Out:             ৳15,000   (marketplace spending, transfers sent)
 ```
 
-
+Each user can see their own wallet balance and full paginated history, including where the money came from and went to.
 
 ## 12.1 Wallet Restrictions
 
@@ -474,19 +485,15 @@ Wallet funds:
 
 - Cannot be withdrawn as cash.
 - Cannot be transferred to external payment accounts.
-- Can be used to purchase marketplace products.
-- Can be transferred to another volunteer.
-- Can be used for rescue-related purchases available through the marketplace.
+- Can be used by any user to donate.
+- Can be used by users to purchase marketplace products.
+- Can be transferred by **active volunteers only** to another active volunteer.
 
 ---
 
-
-
 # 13. Volunteer-to-Volunteer Transfers
 
-A volunteer can transfer some or all of their wallet balance to another volunteer.
-
-Example:
+An active volunteer can transfer some or all of their wallet balance to another active volunteer.
 
 ```text
 Volunteer A
@@ -501,26 +508,22 @@ Volunteer B
 Balance increases by ৳3,000
 ```
 
-The transaction must be recorded.
-
-Transaction information should include:
+The transaction is recorded with:
 
 - Sender
 - Receiver
 - Amount
 - Date/time
 - Transaction type
-- Reference
+- Reference / optional note (up to 200 characters)
+
+Transfers to yourself, to revoked volunteers, or to suspended accounts are rejected.
 
 ---
 
-
-
 # 14. Marketplace
 
-PawAid includes an internal e-commerce marketplace.
-
-The marketplace sells products useful for animal rescue.
+PawAid includes an internal e-commerce marketplace that sells products useful for animal rescue.
 
 Example categories:
 
@@ -531,15 +534,11 @@ Example categories:
 - Bandages
 - Syringes
 
-
-
 ### Food
 
 - Dog food
 - Cat food
 - Other animal food
-
-
 
 ### Rescue Equipment
 
@@ -548,60 +547,36 @@ Example categories:
 - Blankets
 - Protective equipment
 
-
-
 ### Other Supplies
 
 - Cleaning supplies
 - Animal-care products
 
+The storefront lists active products only, filterable by category (only categories with active products are shown). Each product has a details page with "you may also like" suggestions.
+
+Shoppers never see a product's cost price. Instead, each product shows how much of every sale goes to the PawAid Fund.
+
+The cart is kept in the browser and tied to the signed-in user. A guest's cart is adopted on sign in; another account's cart is never shown. Prices and stock in the cart are re-checked against the server.
+
 ---
-
-
 
 # 15. Marketplace Users
 
 Both normal users and volunteers can purchase products.
 
-### Normal User
+Online payments (bKash, Nagad, card) are switched off for now. Checkout offers two methods: **cash on delivery** and **wallet**.
 
-Payment:
+### Normal User / Volunteer
 
 ```text
 Normal User
       ↓
-External/Simulated Payment
+Cash on Delivery/Wallet Fund
       ↓
 Marketplace Order
 ```
 
-
-
-### Volunteer
-
-Payment options:
-
-```text
-Volunteer
-    ↓
-Wallet Balance
-    ↓
-Marketplace
-```
-
-or
-
-```text
-Volunteer
-    ↓
-Personal Payment
-    ↓
-Marketplace
-```
-
 ---
-
-
 
 # 16. Marketplace Product Profit
 
@@ -611,8 +586,6 @@ Every marketplace product has:
 - Selling price
 - Profit
 
-Example:
-
 ```text
 Product:
 
@@ -621,21 +594,20 @@ Selling Price:       ৳1,000
 Profit:              ৳300
 ```
 
-The profit generated from marketplace sales contributes to the volunteer's rescue fund.
+- A product can never be priced below its cost, since marketplace profit funds rescues.
+- Each order line stores the unit price *and* unit cost at the time of sale, so later price or cost edits don't change past profit.
 
-Users should be able to see the profit generated by products.
+The profit generated from marketplace sales goes into the PawAid Fund (§17).
+
+Users can see the profit generated by products.
 
 ---
 
+# 17. PawAid Fund (Rescue Fund)
 
+Rescue Fund is presented to users as the **PawAid Fund**. It is a single platform-wide fund.
 
-# 17. Rescue Fund
-
-The Rescue Fund represents money generated for rescue activities.
-
-One major source is marketplace profit.
-
-Example:
+The PawAid Fund represents money generated for rescue activities. Its source is marketplace profit.
 
 ```text
 Marketplace
@@ -643,78 +615,81 @@ Marketplace
 Total Revenue       ৳500,000
 Product Costs       ৳350,000
 Profit              ৳150,000
-Rescue Contribution ৳150,000
+PawAid Fund         ৳150,000
 ```
 
-The platform should accumulate the contribution.
+Profit is posted to the fund when an order is marked **Delivered**, not when it is paid. A delivered order is a final sale, so a cancellation can never claw back profit that was already given out. Each order's profit is posted exactly once.
 
-Users can view the accumulated rescue fund.
+The fund tracks the total it has received and the total it has given out. The database prevents it from giving out more than it has received.
+
+Users can view the fund's balance and its recent donations.
 
 ---
 
+# 18. PawAid Fund Usage
 
-
-# 18. Rescue Fund Usage
-
-Admins can use accumulated marketplace profits to fund rescue activities.
-
-Example:
+Admins donate from the PawAid Fund to support rescue activities.
 
 ```text
-Rescue Fund
+PawAid Fund
     ↓
-Admin allocates funding
+Admin donates
     ↓
-Volunteer
-    ↓
-Volunteer wallet
+Volunteer  ──or──  Rescue Post
+    ↓                  ↓
+Volunteer wallet   Post's volunteer wallet
+                   (or held on the post until a volunteer takes it)
 ```
 
-This allows the volunteers to financially support rescue activities beyond individual donations.
+A fund allocation is recorded as a **donation whose donor is the PawAid Fund**, so it appears in the donation lists and follows the same rules as a community donation. The ledger entry (`RESCUE_FUND_ALLOCATION`) records which admin made it. Admins make these donations from the Transparency page.
 
 ---
-
-
 
 # 19. Financial Transparency
 
-Financial transparency is a core feature of PawAid.
-
-Users should be able to view aggregated financial information.
-
-Example:
+Financial transparency is a core feature of PawAid. The public Transparency page (`/transparency`) shows aggregated figures, all computed from the ledger:
 
 ```text
               PAWAID FINANCIAL OVERVIEW
 
-Total Donations                 ৳500,000
+Donations
+  Total donations / count / this month
+  Distinct donors (count only)
+  To rescues vs direct to volunteers
+  Average donation
+Wallet top ups
 
-Volunteer Funds                 ৳350,000
+Volunteers
+  Active volunteers
+  Funds held in volunteer wallets
+  Moved from rescues to volunteers on assignment
+  Held for rescues awaiting a volunteer
 
-Marketplace Revenue             ৳800,000
+Rescues
+  Total / awaiting volunteer / in progress / rescued
+  Funded rescues
+  Documented rescue expenses (amount and count)
 
-Marketplace Profit              ৳150,000
+Marketplace
+  Revenue (net of refunds)
+  Profit
+  Delivered orders
 
-Rescue Contribution              ৳150,000
-
-Rescue Fund Available            ৳150,000
-
-Rescue Fund Used                  ৳80,000
-
-Rescue Fund Remaining             ৳70,000
+PawAid Fund
+  Received / donated / balance
+  Given to volunteers vs rescue posts
+  Recent fund donations
 ```
 
-The initial version will show aggregated numbers rather than individual financial transactions to the public.
+The overview shows aggregated numbers rather than individual donors' financial transactions.
 
 ---
 
-
-
 # 20. Financial Transaction Records
 
-Although users see aggregated information, the backend should maintain detailed transaction records.
+Although users see aggregated information, the backend keeps a detailed ledger (`FinancialTransaction`), and every wallet balance change has a matching `WalletTransaction` (credit or debit) linked to it.
 
-Every financial transaction should have:
+Every financial transaction has:
 
 - Transaction ID
 - Source
@@ -725,29 +700,49 @@ Every financial transaction should have:
 - Related volunteer
 - Related rescue post
 - Related order
+- Related payment / donation / fund
 - Timestamp
-- Status
+- Status (`PENDING`, `COMPLETED`, `FAILED`, `CANCELLED`)
 - Reference
 
-Possible transaction types:
+The implemented transaction types are:
 
 ```text
-DONATION
-WALLET_TRANSFER
-MARKETPLACE_PURCHASE
-MARKETPLACE_PROFIT
-RESCUE_FUND_ALLOCATION
+INCOME                  wallet top up
+DONATION                user → rescue post or volunteer
+TRANSFER                volunteer → volunteer, and unassigned post funds → volunteer on assignment
+ORDER_PAYMENT           marketplace purchase (wallet or cash on delivery)
+REFUND                  cancelled wallet order refunded to the buyer's wallet
+MARKETPLACE_PROFIT      delivered order's profit → PawAid Fund
+RESCUE_FUND_ALLOCATION  PawAid Fund → volunteer or rescue post
+EXPENSE                 reserved, not used yet
 ```
+
+`WALLET_TRANSFER` and `MARKETPLACE_PURCHASE` from 1.0 became `TRANSFER` and `ORDER_PAYMENT`.
+
+Admins can browse the whole ledger read-only.
 
 ---
 
-
-
 # 21. Rescue Expense Documentation
 
-For rescue-related spending, supporting documentation should be stored where applicable.
+A rescue expense is **documentation only — no money moves**. Wallet funds can only be spent in the marketplace or transferred (§12.1), so an expense is a public record of where a rescue's money went, not a ledger entry.
 
-Example:
+The volunteer handling a rescue records an expense with:
+
+- Amount
+- Description (what it was spent on)
+- A receipt photo, a link to one of their own marketplace orders, or both
+
+Rules:
+
+- Only the assigned volunteer can record expenses, while the rescue is Assigned, In Progress or Rescued (follow-up vet visits count too).
+- A linked order must belong to the volunteer and not be cancelled or refunded.
+- The expenses linked to one order cannot add up to more than the order's total.
+- A volunteer can remove an expense they recorded by mistake.
+- Only product names from a linked order are shown publicly, never delivery details.
+
+Anyone can see a rescue's expenses and their total.
 
 ```text
 Rescue Expense
@@ -759,56 +754,60 @@ Amount: ৳2,500
 Description:
 Veterinary medicine and treatment
 
+Receipt: [photo]   Order: #A1B2C3D4
 ```
 
-
-
 ---
-
-
 
 # 22. Marketplace Orders
 
-The marketplace should operate similarly to a standard e-commerce platform.
+The marketplace operates like a standard e-commerce platform.
 
 Order information:
 
-- Order ID
+- Order ID (shown as an 8-character order number)
 - Buyer
-- Products
-- Quantity
-- Product price
+- Products, quantity, unit price (and unit cost, internal)
 - Total amount
-- Payment method
+- Payment method and payment status
 - Order status
-- Delivery information
+- Delivery name, phone and address (a snapshot taken at checkout; can optionally be saved to the profile)
 - Created date
-- Updated date
 
-Possible statuses:
+Checkout rules:
+
+- Prices always come from the server. If the total changed since the buyer opened checkout, they are asked to confirm the new total.
+- Stock is checked and reduced atomically, so two buyers can't both take the last unit.
+- A wallet order is paid immediately and starts as `CONFIRMED`. A cash order starts as `PENDING` and its payment is collected on delivery.
+
+Statuses:
 
 ```text
-PENDING
-CONFIRMED
-PROCESSING
-SHIPPED
-DELIVERED
-CANCELLED
+PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED
+   └──────────┴────────────┴───────────┴──→ CANCELLED
+REFUNDED (reserved)
 ```
 
+Orders only move forward and can be cancelled any time before delivery.
+
+- **Delivered:** a cash payment is marked collected and the sale starts counting as revenue; the order's profit is posted to the PawAid Fund.
+- **Cancelled:** items go back into stock. A wallet payment is refunded to the buyer's wallet as its own `REFUND` ledger entry; uncollected cash is marked failed.
+
+Buyers see their orders on their profile (All / Active / Delivered / Cancelled) and on an order details page.
+
 ---
-
-
 
 # 23. Payment System
 
 The intended payment gateway is **SSLCommerz**.
 
-However, because PawAid is initially a portfolio project, payment processing will be simulated.
+Because PawAid is a portfolio project, payment processing is simulated:
 
-The architecture should still separate payment processing from the core business logic so that a real payment provider can be integrated later.
+- **Wallet top up** is a dummy top up: it records a completed payment without collecting money.
+- **Checkout** uses cash on delivery or the wallet.
+- A simulated provider for external methods (bKash, Nagad, card) exists in `payment.services.js` but is switched off.
 
-Example:
+The architecture keeps payment processing separate from the core business logic so that a real provider can be integrated later. With a real gateway, a top up or order would only be confirmed from the gateway's callback.
 
 ```text
 Payment Service
@@ -817,86 +816,91 @@ Simulated Payment Provider
       ↓
 Payment Result
       ↓
-Order / Donation
+Wallet Top Up / Order
 ```
 
-The system should not hard-code the assumption that payments are simulated.
+## 23.1 Duplicate-Payment Protection
+
+*New in 1.1.* Every request that moves money (top up, donations, transfers, checkout, PawAid Fund donations) must carry an `Idempotency-Key` header. The client sends the same key for every attempt at the same payment (a double click, a retry after a timeout):
+
+- The first request runs and its successful response is saved.
+- A repeat after success gets the saved response back; nothing is charged twice.
+- A repeat while the first is still running is rejected (409).
+- A repeat after a failure runs normally, since the failed attempt changed nothing.
+- A key is bound to one user, one endpoint and one request body, and expires after 24 hours.
 
 ---
-
-
 
 # 24. Community Comments
 
 Users can comment on rescue posts.
 
-Comments should contain:
+Comments contain:
 
 - Author
 - Post
 - Content
 - Timestamp
-- Status
 
-Admins should be able to remove inappropriate comments if moderation is added to the implementation scope.
+Comments are paginated, newest first. Authors can delete their own comments; admins can delete any comment.
+
+Comments have no status field; moderation is by deletion.
 
 ---
-
-
 
 # 25. Post Reporting
 
 Users can report inappropriate or suspicious posts.
 
-A report should contain:
+A report contains:
 
 - Reporter
 - Reported post
-- Reason
-- Description
+- Reason (Spam, Fake or misleading, Inappropriate content, Scam or fraud, Other)
+- Description (optional)
 - Timestamp
 - Status
 
-Possible report statuses:
+Report statuses:
 
 ```text
 PENDING
 REVIEWED
 RESOLVED
-DISMISSED
+REJECTED
 ```
 
-Admins can review reports.
+Rules:
 
-Admins can take down posts.
+- A user cannot report their own post.
+- A user can have only one pending report per post.
+- Admins work the report queue oldest first.
+- Taking a post down resolves all of its open reports.
 
 ---
-
-
 
 # 26. Post Moderation
 
 Admins can:
 
-- View posts
+- View, search and filter posts (by status, area, reported)
 - Review reported posts
-- Remove posts
+- Change a post's status
+- Take down posts
 - Review post creators
 - Monitor rescue activity
 
-Removing a post should not silently delete its financial records.
+Taking a post down sets its status to `CANCELLED`. The post leaves the public feed and volunteer profiles but stays in the database, so its donations and financial records are untouched. The creator and admins can still open it.
 
 ---
 
-
-
 # 27. Admin Dashboard
 
-The Admin dashboard should provide a centralized management interface.
+The Admin dashboard (`/admin`) is a single page with tabs: **Overview, Reports, Posts, Users, Volunteers, Areas, Products, Orders, Transactions.** Admin tables page by offset with search and filters.
 
 ## Dashboard Overview
 
-Possible metrics:
+Metrics include:
 
 ```text
 Total Users
@@ -904,28 +908,26 @@ Total Volunteers
 Active Volunteers
 Total Rescue Posts
 Active Rescues
-Total Donations
+Total Donations (community donations only)
 Total Marketplace Sales
 Total Marketplace Profit
-Total Rescue Fund
+PawAid Fund
 ```
 
 ---
-
-
 
 ## User Management
 
 Admin can:
 
-- View users
+- View and search users
 - View user profiles
-- Suspend users
+- Suspend and reactivate users
 - View volunteer status
 
+A suspended user is signed out on their next request and cannot sign in.
+
 ---
-
-
 
 ## Volunteer Management
 
@@ -933,17 +935,15 @@ Admin can:
 
 - View volunteers
 - Search/filter volunteers
-- View volunteer profiles
+- View volunteer profiles, including NID
 - Revoke volunteer status
 - Restore volunteer status
-- View wallet balances
+- View wallet balances (read-only)
 - View rescue activity
 
-Admin cannot manually modify wallet balances without creating an appropriate financial transaction.
+Admin cannot modify wallet balances. Every balance change goes through a financial transaction.
 
 ---
-
-
 
 # 28. Marketplace Administration
 
@@ -951,58 +951,55 @@ Admin manages the marketplace.
 
 Admin can:
 
-- Create products
+- Create products (with image)
 - Edit products
-- Delete/deactivate products
+- Deactivate products (products are deactivated, not deleted, because past orders point at them)
 - Set product price
-- Set product cost
+- Set product cost (price can never be below cost)
 - Manage inventory
-- Manage categories
+- Create categories
 - View orders
 - Update order status
 - View product profitability
 
-Only Admin can manage marketplace products in the initial version.
+Only Admin can manage marketplace products.
 
 ---
-
-
 
 # 29. Access Control
 
-The system should use role-based access control.
+The system uses role-based access control, plus a check on the volunteer profile's status for volunteer-only actions.
 
-Basic permission model:
+| Feature                    | Admin       | Volunteer         | Normal User |
+| -------------------------- | ----------- | ----------------- | ----------- |
+| View community             | Yes         | Yes               | Yes         |
+| Create rescue post         | Yes         | Yes               | Yes         |
+| Comment / upvote / report  | Yes         | Yes               | Yes         |
+| Top up wallet              | Yes         | Yes               | Yes         |
+| Donate (from wallet)       | Yes         | Yes               | Yes         |
+| Apply as volunteer         | No          | Already volunteer | Yes         |
+| Assign self to rescue      | No          | Yes               | No          |
+| Post rescue updates        | No          | Assigned only     | No          |
+| Record rescue expenses     | No          | Assigned only     | No          |
+| Own wallet & history       | Yes         | Yes               | Yes         |
+| View other wallets         | Read-only   | Public profile    | Public profile |
+| Marketplace purchase (COD) | Yes         | Yes               | Yes         |
+| Use wallet for purchase    | No          | Yes               | Yes         |
+| Transfer wallet funds      | No          | Yes               | No          |
+| Manage products            | Yes         | No                | No          |
+| Manage users               | Yes         | No                | No          |
+| Revoke volunteer           | Yes         | No                | No          |
+| Remove posts               | Yes         | No                | No          |
+| View financial overview    | Yes         | Yes               | Yes         |
+| Donate from PawAid Fund    | Yes         | No                | No          |
 
-
-| Feature                  | Admin       | Volunteer         | Normal User |
-| ------------------------ | ----------- | ----------------- | ----------- |
-| View community           | Yes         | Yes               | Yes         |
-| Create rescue post       | Yes         | Yes               | Yes         |
-| Comment                  | Yes         | Yes               | Yes         |
-| Donate                   | Yes         | Yes               | Yes         |
-| Create volunteer profile | Yes         | Yes               | No          |
-| Apply as volunteer       | No          | Already volunteer | Yes         |
-| Assign self to rescue    | No          | Yes               | No          |
-| Volunteer wallet         | View/manage | Own wallet        | No          |
-| Marketplace purchase     | Yes         | Yes               | Yes         |
-| Use wallet for purchase  | No          | Yes               | No          |
-| Transfer wallet funds    | No          | Yes               | No          |
-| Manage products          | Yes         | No                | No          |
-| Manage users             | Yes         | No                | No          |
-| Revoke volunteer         | Yes         | No                | No          |
-| Remove posts             | Yes         | No                | No          |
-| View financial overview  | Yes         | Yes               | Yes         |
-| Manage rescue fund       | Yes         | No                | No          |
-
+"Volunteer" means an *active* volunteer. A revoked volunteer has normal-user permissions.
 
 ---
 
-
-
 # 30. Core Data Entities
 
-The initial database should be designed around the following entities.
+The implemented database has the following entities.
 
 ```text
 User
@@ -1010,11 +1007,14 @@ VolunteerProfile
 RescueArea
 RescuePost
 RescuePostImage
+RescueUpdate          
+RescueUpdateImage     
 Comment
+PostUpvote            
 PostReport
 
 Donation
-Wallet
+Wallet               
 WalletTransaction
 
 Product
@@ -1024,24 +1024,21 @@ OrderItem
 
 Payment
 FinancialTransaction
-RescueFund
-RescueExpense
-Receipt
+RescueFund            
+RescueExpense         
+IdempotencyKey        
 ```
 
-Relationships will be defined during the database design phase.
+
+All money amounts are stored as whole-taka integers. The ER diagram is in `Schema.mmd` / `Schema.png`, and the source of truth is `backend/prisma/schema.prisma`.
 
 ---
-
-
 
 # 31. Important Financial Architecture Rule
 
 Wallet balances should not be treated as the sole source of truth.
 
-Instead, the system should maintain a transaction ledger.
-
-For example:
+Instead, the system maintains a transaction ledger. Every write to a wallet balance happens in the same database transaction as its `WalletTransaction` row, which links to the `FinancialTransaction` that caused it.
 
 ```text
 Wallet Transaction History
@@ -1055,12 +1052,9 @@ Wallet Transaction History
 = ৳6,500 Balance
 ```
 
-
 This is particularly important because PawAid deals with money.
 
 ---
-
-
 
 # 32. Main User Flow — Becoming a Volunteer
 
@@ -1069,7 +1063,7 @@ Normal User
      ↓
 Apply as Volunteer
      ↓
-Provide Volunteer Information
+Provide NID, phone, address, description
      ↓
 Select Rescue Area
      ↓
@@ -1086,8 +1080,6 @@ Admin can revoke the role later.
 
 ---
 
-
-
 # 33. Main User Flow — Creating a Rescue Request
 
 ```text
@@ -1097,35 +1089,37 @@ Create Rescue Post
        ↓
 Upload Animal Images
        ↓
-Describe Rescue Situation
+Describe Rescue Situation (+ optional donation target)
        ↓
 Publish
        ↓
 Community
        ↓
-Users Donate
+Users Donate (from their wallets)
        ↓
-Donation Held in Unassigned Rescue Balance
+Donation Held on the Post
        ↓
 Volunteer Assigns Self
        ↓
 Funds Move to Volunteer Wallet
+       ↓
+Volunteer Posts Updates & Expenses
+       ↓
+Volunteer Marks Rescue as Rescued
 ```
 
 ---
-
-
 
 # 34. Main User Flow — Direct Volunteer Donation
 
 ```text
 User
  ↓
+Top Up Wallet (if needed)
+ ↓
 Volunteer Profile
  ↓
 Donate
- ↓
-Payment
  ↓
 Donation Recorded
  ↓
@@ -1134,8 +1128,6 @@ Volunteer Wallet
 
 ---
 
-
-
 # 35. Main User Flow — Volunteer Marketplace Purchase
 
 ```text
@@ -1143,26 +1135,24 @@ Volunteer
     ↓
 Marketplace
     ↓
-Select Product
+Add Products to Cart
     ↓
-Checkout
+Checkout (delivery details)
     ↓
 Choose Wallet
     ↓
 Check Wallet Balance
     ↓
-Deduct Wallet Amount
+Reserve Stock, Create Order & Payment
     ↓
-Create Order
+Deduct Wallet Amount
     ↓
 Create Wallet Transaction
 ```
 
-The purchase should fail if the volunteer's available wallet balance is insufficient.
+All of these steps happen in one database transaction. The purchase fails if the volunteer's wallet balance is insufficient.
 
 ---
-
-
 
 # 36. Main User Flow — Volunteer Transfer
 
@@ -1171,7 +1161,7 @@ Volunteer A
     ↓
 Select Volunteer B
     ↓
-Enter Amount
+Enter Amount (+ optional note)
     ↓
 Confirm Transfer
     ↓
@@ -1182,11 +1172,9 @@ Credit Volunteer B
 Create Transaction Records
 ```
 
-Both sides should receive corresponding transaction records.
+Both sides receive corresponding transaction records.
 
 ---
-
-
 
 # 37. Main User Flow — Marketplace Profit
 
@@ -1195,77 +1183,67 @@ Customer Purchase
        ↓
 Marketplace Order
        ↓
-Payment Completed
+Admin moves order through to Delivered
+       ↓
+Payment Completed (cash collected / wallet already paid)
        ↓
 Revenue Recorded
        ↓
-Product Cost Calculated
+Profit = Σ (unit price − unit cost) × quantity
        ↓
-Profit Calculated
-       ↓
-Profit Added to Rescue Contribution
-       ↓
-Rescue Fund Updated
+Profit Added to PawAid Fund
 ```
-
-Example:
 
 ```text
 Sale Price:       ৳1,000
 Product Cost:       ৳700
 Profit:             ৳300
 
-Rescue Fund:
+PawAid Fund:
 + ৳300
 ```
 
 ---
 
-
-
-# 38. Main User Flow — Rescue Fund Allocation
+# 38. Main User Flow — PawAid Fund Allocation
 
 ```text
 Marketplace Profit
        ↓
-Rescue Fund
+PawAid Fund
        ↓
-Admin Allocates Funds
+Admin Donates (Transparency page)
        ↓
-Volunteer / Rescue Activity
+Volunteer / Rescue Post
        ↓
 Funds Available for Marketplace Rescue Purchases
 ```
 
-The allocation must create a financial transaction.
+The allocation creates a donation and a `RESCUE_FUND_ALLOCATION` financial transaction, and fails if the fund doesn't have enough.
 
 ---
-
-
 
 # 39. Security Requirements
 
-Because the platform handles user identity and financial information, the backend should implement:
+Because the platform handles user identity and financial information, the backend implements:
 
-- Password hashing
-- Authentication tokens/session management
-- Role-based authorization
-- Input validation
-- File upload validation
-- Image type/size restrictions
-- NID data protection
-- Secure payment handling
-- Transaction authorization
-- Prevention of duplicate payments
-- Prevention of unauthorized wallet access
-- Database transaction consistency
-- Audit logs for sensitive administrative actions
+- Password hashing (bcrypt) — **done**
+- Authentication tokens (JWT, 7-day expiry, sent as a Bearer token) — **done**
+- Role-based authorization (admin and active-volunteer middleware) — **done**
+- Input validation (Zod) — **done**
+- File upload validation: images only, 5 MB limit, file count per route — **done**
+- NID data protection: never in public responses — **done**
+- Secure payment handling — simulated (§23)
+- Transaction authorization — **done**
+- Prevention of duplicate payments (idempotency keys, §23.1) — **done**
+- Prevention of unauthorized wallet access — **done**
+- Database transaction consistency, including atomic balance checks — **done**
+- Suspended accounts are signed out on their next request — **done**
+- Audit logs for sensitive administrative actions — **not yet built**
 
-NID information should not be publicly visible on volunteer profiles.
+NID information is never publicly visible on volunteer profiles. Contact details, wallet and NID on a user profile are only visible to the owner and admins.
 
 ---
-
-
 
 # 40. Financial Integrity Requirements
 
@@ -1285,134 +1263,116 @@ Order created
 Wallet not deducted
 ```
 
-Both operations should succeed or fail together.
+Both operations succeed or fail together.
 
 The same principle applies to:
 
+- Wallet top ups
 - Donations
 - Wallet transfers
-- Marketplace purchases
-- Rescue-fund allocations
+- Rescue assignment (moving unassigned funds)
+- Marketplace purchases, cancellations and refunds
+- Profit posting
+- PawAid Fund donations
 
-Database transactions should be used wherever appropriate.
+Every one of these runs in a database transaction. Balance checks are done in the same statement as the deduction, so concurrent requests can't spend the same money twice. The database also enforces that a donation has exactly one source (a user or the fund) and that the fund is never overdrawn.
 
 ---
 
-
-
 # 41. Public Financial Information
 
-Public users should be able to view aggregated financial information.
-
-They should be able to see:
+Public users can view aggregated financial information:
 
 - Total donations
 - Total marketplace revenue
 - Total marketplace profit
-- Total rescue contribution
-- Total rescue fund
-- Total rescue fund used
-- Remaining rescue fund
-- Volunteer aggregate donation information
-
-Individual donor financial details should not be publicly exposed.
+- PawAid Fund received, donated and remaining
+- Volunteer aggregate donation and wallet information
+- Documented rescue expenses
 
 ---
-
-
 
 # 42. MVP Scope
 
-The first version of PawAid should focus on the core system.
-
-## MVP Features
-
-
+Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 
 ### Authentication
 
-- Registration
-- Login
-- Logout
-- Role management
-
-
+- ✅ Registration
+- ✅ Login
+- ✅ Logout (client side: the token is cleared from the browser)
+- ✅ Role management
 
 ### Volunteers
 
-- Volunteer application
-- Volunteer profile
-- Rescue area selection
-- Volunteer directory
-- Volunteer donation
-
-
+- ✅ Volunteer application
+- ✅ Volunteer profile
+- ✅ Rescue area selection
+- ✅ Volunteer directory
+- ✅ Volunteer donation
 
 ### Community
 
-- Create rescue post
-- Upload images
-- Rescue donation
-- Comments
-- Post reporting
-- Admin post moderation
-
-
+- ✅ Create, edit and delete rescue posts
+- ✅ Upload images
+- ✅ Rescue donation
+- ✅ Comments
+- ✅ Upvotes
+- ✅ Post reporting
+- ✅ Admin post moderation
+- ✅ Rescue details page, progress updates and status lifecycle
 
 ### Donation System
 
-- One-time donations
-- Post donations
-- Volunteer donations
-- Unassigned donation balance
-- Volunteer wallets
-
-
+- ✅ One-time donations
+- ✅ Post donations
+- ✅ Volunteer donations
+- ✅ Unassigned donation balance
+- ✅ Wallets
+- 🟡 Payment: simulated wallet top up instead of a payment per donation
 
 ### Wallet
 
-- Wallet balance
-- Wallet transaction history
-- Marketplace purchases
-- Volunteer-to-volunteer transfers
-
-
+- ✅ Wallet balance
+- ✅ Wallet transaction history
+- ✅ Marketplace purchases
+- ✅ Volunteer-to-volunteer transfers
 
 ### Marketplace
 
-- Product categories
-- Products
-- Product pricing
-- Product cost
-- Product profit
-- Inventory
-- Orders
-- Checkout
+- ✅ Product categories
+- ✅ Products
+- ✅ Product pricing, cost and profit
+- ✅ Inventory
+- ✅ Cart
+- ✅ Orders
+- 🟡 Checkout (cash on delivery and wallet; online payment switched off)
 
+### PawAid Fund
 
-
-### Rescue Fund
-
-- Marketplace profit tracking
-- Rescue contribution
-- Rescue fund balance
-- Admin allocation
-- Public financial overview
-
-
+- ✅ Marketplace profit tracking
+- ✅ Fund balance
+- ✅ Admin allocation (fund donations)
+- ✅ Public financial overview
+- ✅ Rescue expense documentation
 
 ### Admin
 
-- User management
-- Volunteer management
-- Post moderation
-- Product management
-- Order management
-- Financial dashboard
+- ✅ User management
+- ✅ Volunteer management
+- ✅ Post moderation and report queue
+- ✅ Area management
+- ✅ Product management
+- ✅ Order management
+- ✅ Financial dashboard and read-only ledger
+
+### Hardening
+
+- ✅ Duplicate-payment prevention
+- ⬜ Audit logs for admin actions
+- ⬜ Automated tests (ledger reconciliation, end-to-end MVP flow)
 
 ---
-
-
 
 # 43. MVP Success Criteria
 
@@ -1425,7 +1385,7 @@ User creates rescue post
       ↓
 Another user sees the post
       ↓
-User donates
+User tops up their wallet and donates
       ↓
 Donation remains unassigned
       ↓
@@ -1433,20 +1393,21 @@ Volunteer assigns themselves
       ↓
 Donation moves to volunteer wallet
       ↓
-Volunteer purchases medicine
+Volunteer purchases medicine with their wallet
       ↓
 Wallet balance decreases
       ↓
 Order is created
       ↓
+Admin marks the order Delivered
+      ↓
 Marketplace profit is calculated
       ↓
-Profit contributes to rescue fund
+Profit goes into the PawAid Fund
       ↓
 Users can view the updated financial overview
 ```
 
-If this end-to-end flow works correctly, the core PawAid concept is functioning.
+If this end-to-end flow works correctly, the core PawAid concept is functioning. Every step is implemented; an automated end-to-end test of the flow is still to be written.
 
 ---
-
