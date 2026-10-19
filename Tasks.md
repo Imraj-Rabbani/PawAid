@@ -1,5 +1,22 @@
 # PawAid — Build Plan
 
+**Last updated:** 2026-10-19
+
+| Stage | Status |
+| --- | --- |
+| 1 — Foundation | ✅ Done (with changes) |
+| 2 — Volunteer System | ✅ Done |
+| 3 — Community / Rescue Posts | ✅ Done, extended |
+| 4 — Ledger Core | 🟡 Built, tests missing |
+| 5 — Donations & Wallet | ✅ Done (with changes) |
+| 6 — Marketplace | ✅ Done (with changes) |
+| 7 — PawAid Fund (Rescue Fund) | ✅ Done (with changes) |
+| 8 — Financial Transparency & Admin Dashboard | ✅ Done |
+| 9 — Polish & Security Pass | 🟡 In progress |
+
+Legend: `[x]` done · `[~]` done differently than planned (see note) · `[ ]` not done.
+"PRD Dn" refers to the Decision Log in PRD §44.
+
 ---
 
 ## Stage 1 — Foundation
@@ -11,214 +28,229 @@ This stage has no user-facing features yet — it's the skeleton everything else
 
 **Deliverables:**
 
-- [ ] Prisma schema translated from the ER diagram — all 17 entities, relations, and enums (roles, statuses, transaction types)
-- [ ] Initial migration applied to PostgreSQL
-- [ ] `config/db.js`, `config/env.js` set up
-- [ ] JWT-based auth: register, login, logout, token refresh (if needed)
-- [ ] `auth.middleware.js` (verifies JWT) and `rbac.middleware.js` (role gate: Admin / Volunteer / Normal User)
-- [ ] Basic User CRUD (self-profile view/update, admin list/suspend)
-- [ ] Global `errorHandler.js` and Zod-based request validation wired into the module pattern
+- [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 22 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey).
+- [x] Initial migration applied to PostgreSQL (12 migrations to date)
+- [~] `config/env.js` set up; the DB client lives in `src/db.js` (Prisma 7 with the `pg` adapter)
+- [~] JWT-based auth: register, login. Logout is client side (token removed from the browser); no refresh token, 7-day expiry instead (PRD D24)
+- [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
+- [x] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
+- [~] Global error handler inline in `server.js`; Zod validation done per controller rather than as shared middleware
 
 **Key considerations:**
 
-- Password hashing (bcrypt or argon2) from day one
-- Decide now how role escalation works (User → Volunteer) since it affects the User/VolunteerProfile relationship
-- Stub out `upload.middleware.js` (Cloudinary) even if unused yet — Stage 3 needs it immediately
+- Password hashing with bcrypt from day one — done
+- Role escalation: applying creates a `VolunteerProfile` and sets the user's role to `VOLUNTEER` in one transaction; revocation changes the profile status, not the role (PRD D5)
+- Uploads go to **Cloudflare R2** via `upload.services.js`, not Cloudinary (PRD D24)
 
 ---
-
-
 
 ## Stage 2 — Volunteer System
 
 **Goal:** Volunteers can apply, get a public profile, and be found by area — without any money flowing yet.
 
 **Description:**
-This is the first user-visible feature. Wallet balance and donation totals on the profile can be hardcoded to zero/placeholder until Stage 5 — the point here is the profile structure, area filtering, and the no-approval-required application flow (PRD §5.2, §32).
+This is the first user-visible feature. Wallet balance and donation totals on the profile could be placeholders until Stage 5 — the point here is the profile structure, area filtering, and the no-approval-required application flow (PRD §5.2, §32).
 
 **Deliverables:**
 
-- [ ] RescueArea model + admin seed/CRUD (predefined list, e.g. Dhaka → Dhanmondi, Mirpur, Uttara...)
-- [ ] Volunteer application endpoint: collects name, email, phone, address, profile picture, NID, rescue area, postal code, description
-- [ ] Auto-activation on application (no admin approval step, per §5.2)
-- [ ] Public volunteer profile page/endpoint (name, picture, description, area, status — donation/wallet fields wired but returning 0 for now)
-- [ ] Volunteer directory: list + filter by rescue area
-- [ ] Admin: revoke/restore volunteer status
+- [x] RescueArea model + admin CRUD (add, rename, delete only if unused)
+- [~] Volunteer application endpoint: rescue area and NID required; phone, address, description optional; name/email/picture come from the account (PRD D4)
+- [x] Auto-activation on application (no admin approval step, per §5.2)
+- [x] Public volunteer profile page/endpoint (name, picture, description, area, status, donation totals, wallet totals and public wallet history)
+- [x] Volunteer directory: list + filter by rescue area
+- [x] Admin: revoke/restore volunteer status
 
 **Key considerations:**
 
-- NID must never be exposed on the public profile endpoint (§39) — enforce this at the serializer level, not just the frontend
-- "Volunteer can change rescue area" — model this as an update, not a new record
-- Revoked volunteers should fail RBAC checks for volunteer-only actions immediately, not just hide UI
+- NID never exposed on the public profile or directory — enforced in the Prisma `select`
+- Changing rescue area is an update to the profile
+- Revoked volunteers fail `requireActiveVolunteer` immediately
 
 ---
-
-
 
 ## Stage 3 — Community / Rescue Posts
 
-**Goal:** Users and volunteers can create, browse, and interact with rescue posts. This is your first fully demoable feature loop.
-
-**Description:**
-Still no money involved — `donation_target` and `donation_received` fields exist on the schema but stay at their defaults. This stage proves out image upload, moderation, and the comment/report subsystems in isolation, which keeps Stage 5 (donations) focused purely on financial logic.
+**Goal:** Users and volunteers can create, browse, and interact with rescue posts. This is the first fully demoable feature loop.
 
 **Deliverables:**
 
-- [ ] Rescue post CRUD (title, description, images, area, creator)
-- [ ] Image upload via Cloudinary (multiple images per post)
-- [ ] Comments (create, list, admin delete)
-- [ ] Post reporting (create report, admin review queue with PENDING/REVIEWED/RESOLVED/DISMISSED states)
-- [ ] Admin moderation: remove post (soft-delete — must NOT cascade-delete financial records per §26)
-- [ ] Post status field scaffolded (`Awaiting Volunteer`, etc.) even though assignment logic lands in Stage 5
+- [x] Rescue post CRUD (title, description, images, area, creator, optional donation target)
+- [~] Image upload via R2 (up to 5 images per post)
+- [x] Comments (create, paginated list, delete by author or admin)
+- [~] Post reporting (create report, admin review queue with PENDING/REVIEWED/RESOLVED/**REJECTED**) (PRD D9)
+- [x] Admin moderation: take down = status `CANCELLED`, financial records untouched (PRD D10)
+- [x] Post status lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED`, plus `CLOSED`/`CANCELLED` (PRD D6)
+
+**Added beyond the plan:**
+
+- [x] Post upvotes (one per user, toggle)
+- [x] Homepage feed with cursor pagination and tabs (All / Needs a Volunteer / Fundraising / Rescued)
+- [x] Creator can edit/delete only while open and unassigned; no delete once donations exist (PRD D7)
+- [x] Volunteer progress: In Progress → Rescued with closing note and photo
+- [x] Rescue updates timeline (notes + up to 4 photos) by the assigned volunteer
+- [x] Rescue details page (`/rescue/:postId`) with gallery, donation card, volunteer card, updates, expenses, comments
+- [x] "Rescues" tab on the profile page (posted / handling)
 
 **Key considerations:**
 
-- Soft-delete posts, not hard-delete, so future donation/financial records stay intact
-- Image validation (type/size) belongs in `upload.middleware.js`, not per-route
+- Posts are soft-deleted by admins; creator deletes are only allowed when no money is attached
+- Image type/size validation lives in `upload.middleware.js` (images only, 5 MB)
 
 ---
-
-
 
 ## Stage 4 — Ledger Core
 
-**Goal:** A standalone, independently testable financial ledger service that every later money-moving feature will call into.
+**Goal:** A ledger layer that every money-moving feature calls into.
 
 **Description:**
-This is infrastructure, not a feature — there's no new user-facing endpoint here. But it's the highest-risk piece in the whole system (§31, §40): wallet balances must never be treated as source-of-truth, only ever derived from or reconciled against the transaction log. Build and unit-test this in isolation before wiring donations or marketplace to it.
+Wallet balances must never be the sole source of truth (§31, §40). Instead of a single `ledger.service.js`, the ledger is the `FinancialTransaction` table plus two helper services that every money flow uses inside a `prisma.$transaction`.
 
 **Deliverables:**
 
-- [ ] `money.util.js` — integer-cents (or poisha) conversion helpers, no floating point anywhere
-- [ ] `ledger.service.js` — functions like `recordTransaction()`, `applyWalletDelta()`, wrapping everything in DB transactions (atomic by design)
-- [ ] `FinancialTransaction` and `WalletTransaction` write paths, covering all five types: DONATION, WALLET_TRANSFER, MARKETPLACE_PURCHASE, MARKETPLACE_PROFIT, RESCUE_FUND_ALLOCATION
+- [~] Money as whole-taka integers (`Int` columns); no `money.util.js` needed since amounts are never fractional (PRD D21)
+- [~] `wallet.services.js` (`creditWallet`, `debitWallet` with an atomic balance check) and `fund.services.js` (`creditFund`, `debitFund`), always called inside a DB transaction
+- [~] `FinancialTransaction` + `WalletTransaction` write paths for the implemented types: INCOME, DONATION, TRANSFER, ORDER_PAYMENT, REFUND, MARKETPLACE_PROFIT, RESCUE_FUND_ALLOCATION (PRD D20)
 - [ ] Reconciliation query/test: sum of a wallet's transactions == wallet.balance
+- [ ] Unit tests for the wallet and fund services
 
 **Key considerations:**
 
-- Every write to `Wallet.balance` should happen inside the same DB transaction as its corresponding `WalletTransaction` row — never update one without the other
-- Write this stage with unit tests before building anything that depends on it; bugs here corrupt every downstream feature
+- Every write to `Wallet.balance` happens in the same DB transaction as its `WalletTransaction` row — done
+- DB constraints: a donation has exactly one source (user or fund); the fund can't be overdrawn
+- **No test suite exists yet** (`backend/package.json` has a placeholder `test` script). This is the main gap in this stage.
 
 ---
-
-
 
 ## Stage 5 — Donations & Wallet
 
 **Goal:** Money can flow from donor → post/volunteer → wallet, and volunteers can manage and move their wallet funds.
 
 **Description:**
-This is where Stage 4's ledger gets its first real callers. The critical flow is the unassigned-funds handoff (§9): a donation to a post with no assigned volunteer sits in an "unassigned" state until a volunteer self-assigns, at which point the balance transfers to their wallet — atomically.
+The critical flow is the unassigned-funds handoff (§9): a donation to a post with no assigned volunteer sits on the post until a volunteer self-assigns, at which point the balance transfers to their wallet — atomically.
 
 **Deliverables:**
 
-- [ ] Donate-to-post endpoint (routes to unassigned balance or directly to assigned volunteer's wallet depending on post state)
-- [ ] Donate-to-volunteer endpoint (direct wallet credit)
-- [ ] Volunteer self-assign-to-post action → triggers unassigned-funds-to-wallet transfer
-- [ ] Wallet balance view + transaction history endpoint
-- [ ] Volunteer-to-volunteer transfer (debit sender, credit receiver, both sides get transaction records, §13)
-- [ ] Update volunteer profile to show real donation/wallet numbers (replacing Stage 2 placeholders)
+- [x] Donate-to-post endpoint (held on the post, or straight to the assigned volunteer's wallet)
+- [x] Donate-to-volunteer endpoint (direct wallet credit)
+- [x] Volunteer self-assign-to-post action → unassigned funds moved to wallet in the same transaction
+- [x] Wallet balance view + paginated transaction history with in/out totals
+- [x] Volunteer-to-volunteer transfer with optional note (§13)
+- [x] Volunteer profile shows real donation/wallet numbers
+
+**Added / changed:**
+
+- [~] Every user has a wallet, created at sign up (migration `wallet_per_user`) (PRD D1)
+- [~] Donations are paid from the donor's wallet; demo wallet top up is the only way money enters (PRD D2)
+- [x] Self-donation rules: not to yourself, your own post, or a rescue you handle (PRD D3)
+- [x] Donation history: platform-wide `/donations` page and a Donations tab on the profile (made / received)
 
 **Key considerations:**
 
-- Self-assignment and fund transfer must be one atomic operation — a post can't end up "assigned" with funds still unassigned, or vice versa
-- Enforce: only one volunteer per post (MVP constraint, §9)
-- Transfers need a balance check before debiting
+- Assignment uses a conditional update so only one volunteer can claim a post — done
+- Balance checks are part of the debit statement, so concurrent requests can't overspend — done
 
 ---
-
-
 
 ## Stage 6 — Marketplace
 
 **Goal:** A working e-commerce flow where both normal users and volunteers can buy products, with volunteers able to pay from wallet funds.
 
-**Description:**
-Structurally a standard e-commerce module, but the wallet-payment path (§35) is the new complexity — it must reuse Stage 4's ledger and fail cleanly on insufficient balance.
-
 **Deliverables:**
 
-- [ ] Product categories + products (cost price, selling price, stock, active flag)
-- [ ] Admin product management (create/edit/deactivate, only Admin per §28)
-- [ ] Order + OrderItem creation, checkout flow
-- [ ] Two payment paths: simulated external payment (normal users, or volunteers paying personally) and wallet payment (volunteers only)
-- [ ] `payment.service.js` — simulated provider behind an SSLCommerz-shaped interface (§23)
-- [ ] Order status lifecycle: PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED / CANCELLED
+- [x] Product categories + products (cost price, selling price, stock, active flag, description, image)
+- [x] Admin product management (create/edit/deactivate; price can't be below cost) (PRD D15)
+- [x] Order + OrderItem creation, checkout flow (unit price and unit cost snapshotted)
+- [~] Payment paths: **cash on delivery** (everyone) and **wallet** (active volunteers only). Online/simulated external payment switched off (PRD D12)
+- [~] `payment.services.js` has a simulated provider behind an SSLCommerz-shaped interface, but it is not wired in
+- [~] Order status lifecycle: PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED, cancel any time before delivery; `REFUNDED` added (PRD D13, D14)
+
+**Added beyond the plan:**
+
+- [x] Storefront and product details page with category filter and "you may also like"
+- [x] Cart (browser storage, per user, re-synced with server prices/stock) (PRD D16)
+- [x] Address management on the profile; delivery details snapshotted on each order
+- [x] Price-change check at checkout (`expectedTotal`)
+- [x] Cancelling restocks items and refunds wallet payments through the ledger
+- [x] Orders tab on the profile + order details page
 
 **Key considerations:**
 
-- Wallet purchase = wallet deduction + order creation + WalletTransaction, all atomic (§35, §40) — reuse `ledger.service.js`, don't reimplement
-- Keep `payment.service.js` provider-agnostic so a real SSLCommerz integration can drop in later without touching order logic
+- Stock reservation, order, payment, ledger entry and wallet debit are one transaction — done
+- Products are locked in a fixed order to avoid deadlocks between concurrent checkouts
 
 ---
 
+## Stage 7 — PawAid Fund (Rescue Fund)
 
-
-## Stage 7 — Rescue Fund
-
-**Goal:** Marketplace profit automatically accumulates into a rescue fund that admins can allocate back to volunteers.
-
-**Description:**
-This closes the profit loop described in §16–18 and §37. Every completed marketplace sale should trigger a profit calculation (`selling_price - cost_price` per item) that flows into the shared `RescueFund` record via a `MARKETPLACE_PROFIT` transaction.
+**Goal:** Marketplace profit accumulates into a fund that admins can give back to volunteers and rescues.
 
 **Deliverables:**
 
-- [ ] Profit calculation hook on order completion (per item, summed)
-- [ ] `RescueFund` accumulation (total_available, total_used)
-- [ ] Admin allocation endpoint: fund → volunteer wallet, creates `RESCUE_FUND_ALLOCATION` transaction and `RescueExpense` record where applicable
-- [ ] Rescue expense documentation: receipt upload tied to a transaction/order (§21)
+- [~] Profit posted when an order is marked **Delivered** (per item: (unit price − unit cost) × quantity) (PRD D17)
+- [x] Single `RescueFund` row (the PawAid Fund) tracking total received (`total_available`) and total given (`total_used`)
+- [~] Admin allocation is a **donation from the fund** to a volunteer or a rescue post, recorded as `RESCUE_FUND_ALLOCATION` and naming the admin (PRD D18)
+- [~] Rescue expense documentation: the assigned volunteer records expenses with a receipt photo and/or a linked marketplace order. Documentation only, no money moves (PRD D19)
 
 **Key considerations:**
 
-- Profit posting should happen once per order (idempotency — don't double-count on status changes)
-- Admin cannot directly edit wallet balances (§27) — allocation must always go through the ledger
+- Profit is posted once per order: DELIVERED can only be reached once
+- Admin cannot edit balances directly; every allocation goes through the ledger and fails if the fund is short
 
 ---
-
-
 
 ## Stage 8 — Financial Transparency & Admin Dashboard
 
 **Goal:** Aggregated public financial visibility, plus a centralized admin control panel.
 
-**Description:**
-Mostly read-side work at this point — aggregating data that Stages 4–7 already produce correctly. The public overview (§19, §41) must show aggregates only, never individual donor details.
-
 **Deliverables:**
 
-- [ ] Public financial overview endpoint (total donations, volunteer funds, marketplace revenue/profit, rescue contribution, rescue fund available/used/remaining)
-- [ ] Admin dashboard overview metrics (users, volunteers, active rescues, totals)
-- [ ] Admin user management (view, suspend)
-- [ ] Admin volunteer management (search/filter, view profiles, revoke/restore, view wallets — read-only)
-- [ ] Admin order management (view, update status)
-- [ ] Admin post moderation surface (tie into Stage 3's report queue)
+- [x] Public financial overview (`/transparency`): donations, top ups, volunteer funds, rescues, documented expenses, marketplace revenue/profit, PawAid Fund received/donated/balance, recent fund donations
+- [x] Admin dashboard overview metrics
+- [x] Admin user management (search, view, suspend/reactivate)
+- [x] Admin volunteer management (search/filter, view profiles incl. NID, revoke/restore, view wallets read-only)
+- [x] Admin order management (filter, view, update status)
+- [x] Admin post moderation + report queue
+- [x] Admin area management
+- [x] Admin read-only ledger (Transactions tab)
+- [x] Homepage sidebars (platform totals, top volunteers this month, volunteers to discover, viewer's own summary)
 
 **Key considerations:**
 
-- All aggregate queries should be computed from `FinancialTransaction`/ledger data, not cached counters, to stay consistent with §31
-- Keep individual donor identities out of every public-facing aggregate response
+- Aggregates are computed from `FinancialTransaction` and related tables, not cached counters
+- Individual donor identities are kept out of the transparency overview. **But see the open item in Stage 9 about the public donations page.**
 
 ---
-
-
 
 ## Stage 9 — Polish & Security Pass
 
 **Goal:** Harden the system for the security and integrity requirements in §39–40 before calling the MVP done.
 
-**Description:**
-A cross-cutting pass rather than a new feature — go back through every money-moving and identity-handling endpoint with this checklist.
-
 **Deliverables:**
 
-- [ ] Audit logs for sensitive admin actions (revoke, allocate, product changes)
-- [ ] Duplicate-payment prevention (idempotency keys on payment/donation endpoints)
-- [ ] File upload validation hardening (type/size limits enforced server-side)
-- [ ] Confirm NID never appears in any public or list response
-- [ ] Confirm every multi-step financial operation is wrapped in a DB transaction (re-audit Stages 5–7)
-- [ ] End-to-end test of the full MVP success flow (PRD §43): register → post → donate → assign → wallet → purchase → profit → fund → public overview
+- [ ] Audit logs for sensitive admin actions (revoke, suspend, take down, product changes, order status, fund donations)
+- [x] Duplicate-payment prevention: `Idempotency-Key` required on top up, donations, transfers, checkout and fund donations (PRD D22)
+- [~] File upload validation: images only, 5 MB, per-route file counts. Still to do: check file contents (magic bytes), not just the declared MIME type
+- [x] NID never appears in any public or list response (admin volunteer list only)
+- [x] Every multi-step financial operation wrapped in a DB transaction
+- [ ] End-to-end test of the full MVP success flow (PRD §43): register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview
+
+**Open items found while updating the docs:**
+
+- [ ] **Public donations page shows donor names and amounts** (`GET /api/donations`, `/donations`). This conflicts with PRD §41. Decide: hide donor identities, or allow it and add an "anonymous" option
+- [ ] Reconciliation check and unit tests for the wallet/fund services (from Stage 4)
+- [ ] `JWT_SECRET` falls back to `"secret_123"` when unset; fail at startup instead
+- [ ] Rate limiting on auth and money-moving routes
+- [ ] Update `Architecture.md`: still describes Cloudinary, `ledger.service.js`, `rbac.middleware.js` and the planned folder layout
 
 **Key considerations:**
 
-- This stage is your final gate before considering the MVP complete — the §43 flow is the acceptance test
+- This stage is the final gate before considering the MVP complete — the §43 flow is the acceptance test
 
+---
+
+## Later (post-MVP)
+
+- Real payment gateway (SSLCommerz) for wallet top ups and online checkout, using the existing `payment.services.js` seam
+- Refresh tokens / server-side logout
+- Anonymous donations
+- More than one volunteer per rescue
