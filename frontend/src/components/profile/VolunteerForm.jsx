@@ -155,9 +155,9 @@ export default function VolunteerForm({
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
-          {saving ? "Saving..." : isEditMode ? "Update" : "Submit Application"}
+          {saving ? "Saving..." : isEditMode ? "Save" : "Submit Application"}
         </button>
         <button
           type="button"
