@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import DonateCard from "../components/volunteer/DonateCard";
@@ -61,6 +61,12 @@ export default function VolunteerProfilePage() {
     }
   };
 
+  // the page renders after the fetch, so jump to a #section (e.g. #handling) once it's there
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!loading && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [loading, hash]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -85,7 +91,7 @@ export default function VolunteerProfilePage() {
 }
 
 function VolunteerProfile({ volunteer, onDonated }) {
-  const { user, rescueArea, description, createdAt, assignedPosts, stats, wallet } = volunteer;
+  const { user, rescueArea, description, createdAt, assignedPosts, currentRescues = [], stats, wallet } = volunteer;
 
   return (
     <div className="mt-6 flex flex-col md:flex-row gap-6">
@@ -147,36 +153,64 @@ function VolunteerProfile({ volunteer, onDonated }) {
           </div>
         </div>
 
+        {/* the homepage's "Rescues I'm Handling" link lands here */}
+        <div id="handling" className="scroll-mt-24 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Currently handling
+            {currentRescues.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">({currentRescues.length})</span>
+            )}
+          </h2>
+          {currentRescues.length === 0 ? (
+            <p className="text-sm text-gray-400">Not handling any rescues right now.</p>
+          ) : (
+            <RescueList posts={currentRescues} />
+          )}
+        </div>
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent rescues</h2>
           {assignedPosts.length === 0 ? (
             <p className="text-sm text-gray-400">No rescues assigned yet.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
-              {assignedPosts.map((post) => (
-                <li key={post.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{post.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {post.rescueArea?.name} · {formatDate(post.createdAt)}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 px-3 py-1 text-xs font-medium rounded-full capitalize ${
-                      STATUS_STYLES[post.status] || "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {formatStatus(post.status)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <RescueList posts={assignedPosts} />
           )}
         </div>
 
         {wallet && <WalletHistory transactions={wallet.transactions} />}
       </section>
     </div>
+  );
+}
+
+function RescueList({ posts }) {
+  return (
+    <ul className="divide-y divide-gray-100">
+      {posts.map((post) => (
+        <li key={post.id}>
+          <Link
+            to={`/rescue/${post.id}`}
+            className="group py-3 flex items-center justify-between gap-4"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                {post.title}
+              </p>
+              <p className="text-xs text-gray-500">
+                {post.rescueArea?.name} · {formatDate(post.createdAt)}
+              </p>
+            </div>
+            <span
+              className={`shrink-0 px-3 py-1 text-xs font-medium rounded-full capitalize ${
+                STATUS_STYLES[post.status] || "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {formatStatus(post.status)}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

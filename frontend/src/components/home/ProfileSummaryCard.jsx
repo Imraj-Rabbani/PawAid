@@ -123,7 +123,7 @@ export default function ProfileSummaryCard({ user, me }) {
           <NavItem to={`/profile/${user.id}`} icon="pets" iconClass="text-tertiary" label="My Rescue Posts" count={me?.postCount} />
           {volunteer && isActiveVolunteer && (
             <NavItem
-              to={`/volunteers/${volunteer.id}`}
+              to={`/volunteers/${volunteer.id}#handling`}
               icon="volunteer_activism"
               iconClass="text-secondary"
               label="Rescues I'm Handling"

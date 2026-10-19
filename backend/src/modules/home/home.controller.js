@@ -1,4 +1,5 @@
 import { prisma } from "../../db.js";
+import { ACTIVE_RESCUE_STATUSES } from "../volunteer/volunteer.controller.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 const activeVolunteer = { status: "ACTIVE", user: { status: "ACTIVE" } };
@@ -106,7 +107,10 @@ async function viewerSummary(userId, volunteer) {
           _sum: { amount: true },
         })
       : null,
-    volunteer ? prisma.rescuePost.count({ where: { assignedVolunteerId: volunteer.id } }) : 0,
+    // rescues still under way, matching "Currently handling" on the volunteer page
+    volunteer
+      ? prisma.rescuePost.count({ where: { assignedVolunteerId: volunteer.id, status: { in: ACTIVE_RESCUE_STATUSES } } })
+      : 0,
   ])
 
   return {

@@ -54,6 +54,9 @@ export async function volunteers(req, res) {
 }
 
 
+// a rescue the volunteer has taken on but not finished
+export const ACTIVE_RESCUE_STATUSES = ["ASSIGNED", "IN_PROGRESS"]
+
 export async function volunteerById(req, res) {
   try {
     const { id } = req.params
@@ -113,7 +116,13 @@ export async function volunteerById(req, res) {
       return res.status(404).json({ message: "Volunteer not found" })
     }
 
-    const [totalRescues, resolvedRescues, walletTotals, donations] = await Promise.all([
+    const [currentRescues, totalRescues, resolvedRescues, walletTotals, donations] = await Promise.all([
+      // every rescue still under way, not just the latest few in assignedPosts
+      prisma.rescuePost.findMany({
+        where: { assignedVolunteerId: id, status: { in: ACTIVE_RESCUE_STATUSES } },
+        select: { id: true, title: true, status: true, createdAt: true, rescueArea: true },
+        orderBy: { createdAt: "desc" },
+      }),
       prisma.rescuePost.count({ where: { assignedVolunteerId: id } }),
       prisma.rescuePost.count({ where: { assignedVolunteerId: id, status: "RESOLVED" } }),
       prisma.walletTransaction.groupBy({
@@ -137,6 +146,7 @@ export async function volunteerById(req, res) {
       data: {
         ...profile,
         user,
+        currentRescues,
         wallet: wallet && {
           ...wallet,
           totalReceived: sumOf("CREDIT"),
