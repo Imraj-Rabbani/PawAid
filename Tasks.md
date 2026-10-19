@@ -160,7 +160,7 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 - [x] Product categories + products (cost price, selling price, stock, active flag, description, image)
 - [x] Admin product management (create/edit/deactivate; price can't be below cost) (PRD D15)
 - [x] Order + OrderItem creation, checkout flow (unit price and unit cost snapshotted)
-- [~] Payment paths: **cash on delivery** (everyone) and **wallet** (active volunteers only). Online/simulated external payment switched off (PRD D12)
+- [~] Payment paths: **cash on delivery** (everyone) and **wallet** (any user; frozen for revoked volunteers). Online/simulated external payment switched off (PRD D12)
 - [~] `payment.services.js` has a simulated provider behind an SSLCommerz-shaped interface, but it is not wired in
 - [~] Order status lifecycle: PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED, cancel any time before delivery; `REFUNDED` added (PRD D13, D14)
 

@@ -114,8 +114,9 @@ export async function createOrder(req, res) {
 
         const paidNow = paymentMethod === "WALLET"
         if (paidNow) {
-            // wallet funds are donations, so only an active volunteer may spend them, and only here (PRD §8, §35)
-            if (!activeVolunteer) throw new CheckoutError("Only active volunteers can pay from their wallet.", 403)
+            if (buyer?.volunteerProfile && !activeVolunteer) {
+                throw new CheckoutError("Your volunteer status has been revoked, so your wallet can't be used right now.", 403)
+            }
             if (!buyer.wallet) throw new CheckoutError("Wallet not found.", 404)
             // fail fast with a clear message; debitWallet re-checks atomically inside the transaction
             if (buyer.wallet.balance < total) throw new InsufficientFundsError()

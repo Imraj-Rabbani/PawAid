@@ -78,8 +78,9 @@ function CheckoutForm({ profile, balance }) {
   const total = lines.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
   const rescueTotal = lines.reduce((sum, item) => sum + item.product.rescueContribution * item.quantity, 0);
 
-  const isVolunteer = profile.volunteerProfile?.status === "ACTIVE";
-  const walletCovers = isVolunteer && balance >= total;
+  // a revoked volunteer's wallet may hold donations, so it stays frozen
+  const walletFrozen = Boolean(profile.volunteerProfile) && profile.volunteerProfile.status !== "ACTIVE";
+  const walletCovers = !walletFrozen && balance >= total;
 
   const [delivery, setDelivery] = useState({
     name: profile.name || "",
@@ -228,8 +229,8 @@ function CheckoutForm({ profile, balance }) {
               icon="account_balance_wallet"
               label="PawAid wallet"
               detail={
-                !isVolunteer
-                  ? "For active volunteers only"
+                walletFrozen
+                  ? "Unavailable while your volunteer status is revoked"
                   : balance < total
                     ? `Not enough balance (${taka(balance)})`
                     : `Balance ${taka(balance)}`

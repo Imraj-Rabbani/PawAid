@@ -160,7 +160,7 @@ Normal users can:
 - Comment on posts
 - Upvote posts
 - Report posts
-- Purchase products from the marketplace (cash on delivery)
+- Purchase products from the marketplace (cash on delivery or wallet)
 - View marketplace financial information
 
 A normal user can later apply to become a volunteer.
@@ -486,8 +486,10 @@ Wallet funds:
 - Cannot be withdrawn as cash.
 - Cannot be transferred to external payment accounts.
 - Can be used by any user to donate.
-- Can be used by users to purchase marketplace products.
+- Can be used by any user to purchase marketplace products.
 - Can be transferred by **active volunteers only** to another active volunteer.
+
+A revoked volunteer's wallet is frozen: it may hold donated rescue funds, so it can't be used for purchases until the volunteer is restored. Their balance is kept.
 
 ---
 
@@ -993,7 +995,7 @@ The system uses role-based access control, plus a check on the volunteer profile
 | View financial overview    | Yes         | Yes               | Yes         |
 | Donate from PawAid Fund    | Yes         | No                | No          |
 
-"Volunteer" means an *active* volunteer. A revoked volunteer has normal-user permissions.
+"Volunteer" means an *active* volunteer. A revoked volunteer has normal-user permissions, except that their wallet can't be used for purchases (§12.1).
 
 ---
 
@@ -1128,10 +1130,10 @@ Volunteer Wallet
 
 ---
 
-# 35. Main User Flow — Volunteer Marketplace Purchase
+# 35. Main User Flow — Wallet Marketplace Purchase
 
 ```text
-Volunteer
+User / Volunteer
     ↓
 Marketplace
     ↓
@@ -1150,7 +1152,7 @@ Deduct Wallet Amount
 Create Wallet Transaction
 ```
 
-All of these steps happen in one database transaction. The purchase fails if the volunteer's wallet balance is insufficient.
+All of these steps happen in one database transaction. The purchase fails if the buyer's wallet balance is insufficient, or if the buyer is a revoked volunteer.
 
 ---
 
