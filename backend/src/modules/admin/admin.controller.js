@@ -4,6 +4,7 @@ import { uploadToR2 } from "../../services/upload.services.js";
 import { creditWallet } from "../../services/wallet.services.js";
 import { creditFund, PAWAID_FUND_ID } from "../../services/fund.services.js";
 import { orderNumber } from "../order/order.controller.js";
+import { NOT_REFUNDED, refundHeldDonations } from "../donation/donation.controller.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -57,9 +58,9 @@ export async function getStats(req, res) {
             prisma.postReport.groupBy({ by: ["status"], _count: true }),
             prisma.rescueArea.count(),
             // community donations only; the PawAid Fund's donations are marketplace profit
-            prisma.donation.aggregate({ where: { donorId: { not: null } }, _sum: { amount: true }, _count: true }),
+            prisma.donation.aggregate({ where: { donorId: { not: null }, ...NOT_REFUNDED }, _sum: { amount: true }, _count: true }),
             prisma.donation.aggregate({
-                where: { donorId: { not: null }, createdAt: { gte: monthStart } },
+                where: { donorId: { not: null }, createdAt: { gte: monthStart }, ...NOT_REFUNDED },
                 _sum: { amount: true },
                 _count: true,
             }),
@@ -410,6 +411,8 @@ export async function listAdminPosts(req, res) {
     }
 }
 
+class PostChangedError extends Error {}
+
 // CANCELLED is the admin take down: the post leaves the public feed but stays in
 // the database so its donations and financial records are untouched (PRD §26)
 export async function updatePostStatus(req, res) {
@@ -439,7 +442,15 @@ export async function updatePostStatus(req, res) {
             return res.status(400).json({ message: "A rescue with a volunteer cannot be reopened" })
         }
 
-        const updated = await prisma.$transaction(async (tx) => {
+        const { updated, refund } = await prisma.$transaction(async (tx) => {
+            // only if no volunteer has claimed it since we looked; this also locks the
+            // row, so no donation or assignment can land while the refund runs
+            const { count } = await tx.rescuePost.updateMany({
+                where: { id: post.id, assignedVolunteerId: post.assignedVolunteerId },
+                data: { status },
+            })
+            if (count === 0) throw new PostChangedError()
+
             // taking a post down settles every open report on it
             if (status === "CANCELLED") {
                 await tx.postReport.updateMany({
@@ -448,18 +459,29 @@ export async function updatePostStatus(req, res) {
                 })
             }
 
-            return tx.rescuePost.update({
-                where: { id: post.id },
-                data: { status },
-                select: adminPostSelect,
-            })
-        })
+            // only an OPEN post can be claimed, so money held by a post that leaves OPEN
+            // without a volunteer would be stuck: give it back to the donors
+            const refund = !post.assignedVolunteerId && status !== "OPEN"
+                ? await refundHeldDonations(tx, post.id)
+                : { amount: 0, count: 0 }
+
+            const updated = await tx.rescuePost.findUnique({ where: { id: post.id }, select: adminPostSelect })
+            return { updated, refund }
+        }, { maxWait: 10000, timeout: 20000 })
+
+        const refunded = refund.count > 0
+            ? ` ৳${refund.amount.toLocaleString()} refunded to ${refund.count} donation${refund.count === 1 ? "" : "s"}.`
+            : ""
 
         return res.json({
-            message: status === "CANCELLED" ? "Post taken down" : "Post status updated",
+            message: (status === "CANCELLED" ? "Post taken down." : "Post status updated.") + refunded,
             data: updated,
+            refund,
         })
     } catch (error) {
+        if (error instanceof PostChangedError) {
+            return res.status(409).json({ message: "A volunteer just took this rescue. Refresh and try again." })
+        }
         console.error(error);
         res.status(500).json({ message: "Failed to update post" });
     }

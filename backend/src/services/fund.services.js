@@ -23,6 +23,16 @@ export function creditFund(tx, amount) {
 }
 
 
+// gives back money the fund donated, e.g. to a rescue that was taken down
+// before a volunteer took it; the not-overdrawn check keeps total_used >= 0
+export function refundFund(tx, amount) {
+  return tx.rescueFund.update({
+    where: { id: PAWAID_FUND_ID },
+    data: { totalUsed: { decrement: amount } },
+  })
+}
+
+
 export async function debitFund(tx, amount) {
   // the balance check and the deduction are one statement (Prisma can't compare
   // two columns in a where), so two donations can't both spend the same money

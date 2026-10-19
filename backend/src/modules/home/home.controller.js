@@ -1,5 +1,6 @@
 import { prisma } from "../../db.js";
 import { ACTIVE_RESCUE_STATUSES } from "../volunteer/volunteer.controller.js";
+import { NOT_REFUNDED } from "../donation/donation.controller.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 const activeVolunteer = { status: "ACTIVE", user: { status: "ACTIVE" } };
@@ -23,8 +24,8 @@ export async function homeSummary(req, res) {
     const [monthDonations, allDonations, rescuesFunded, rescuesResolved, topGroups, discover] =
       await Promise.all([
         // community donations only; the PawAid Fund's donations are marketplace profit
-        prisma.donation.aggregate({ where: { donorId: { not: null }, createdAt: { gte: monthStart } }, _sum: { amount: true } }),
-        prisma.donation.aggregate({ where: { donorId: { not: null } }, _sum: { amount: true } }),
+        prisma.donation.aggregate({ where: { donorId: { not: null }, createdAt: { gte: monthStart }, ...NOT_REFUNDED }, _sum: { amount: true } }),
+        prisma.donation.aggregate({ where: { donorId: { not: null }, ...NOT_REFUNDED }, _sum: { amount: true } }),
         prisma.rescuePost.count({ where: { donationReceived: { gt: 0 } } }),
         prisma.rescuePost.count({ where: { status: "RESOLVED" } }),
         prisma.donation.groupBy({
@@ -97,7 +98,7 @@ async function viewerSummary(userId, volunteer) {
   const [wallet, postCount, donated, received, spent, assignedCount] = await Promise.all([
     prisma.wallet.findUnique({ where: { userId }, select: { balance: true } }),
     prisma.rescuePost.count({ where: { creatorId: userId } }),
-    prisma.donation.aggregate({ where: { donorId: userId }, _sum: { amount: true }, _count: true }),
+    prisma.donation.aggregate({ where: { donorId: userId, ...NOT_REFUNDED }, _sum: { amount: true }, _count: true }),
     volunteer
       ? prisma.donation.aggregate({ where: { volunteerId: volunteer.id }, _sum: { amount: true } })
       : null,

@@ -1,7 +1,11 @@
 import z from "zod";
 import { prisma } from "../../db.js";
 import { creditWallet, debitWallet, InsufficientFundsError } from "../../services/wallet.services.js";
-import { debitFund, FundShortfallError, PAWAID_FUND_ID } from "../../services/fund.services.js";
+import { debitFund, FundShortfallError, PAWAID_FUND_ID, refundFund } from "../../services/fund.services.js";
+
+// A refunded donation stays in the history but no longer counts towards any total.
+// Works on Donation and on FinancialTransaction, which both link to the payment.
+export const NOT_REFUNDED = { payment: { status: { not: "REFUNDED" } } };
 
 const donationSchema = z.object({
   amount: z
@@ -479,4 +483,73 @@ export async function donateFromFund(req, res) {
     console.error(error);
     res.status(500).json({ message: "Failed to donate from the fund" });
   }
+}
+
+
+// ========================================
+// REFUNDS FOR RESCUES THAT NEVER GOT A VOLUNTEER
+// ========================================
+
+class RefundMismatchError extends Error {}
+
+// Gives back every donation a rescue post is holding: a user's goes back to
+// their wallet, the PawAid Fund's goes back to the fund. Only for a post that
+// never had a volunteer, so all of its money is still on the post (PRD §9).
+// The caller must have already moved the post out of OPEN in the same
+// transaction: that update locks the row, so no donation or assignment can
+// slip in, and the post can't be claimed afterwards.
+// Returns { amount, count } of what was refunded.
+export async function refundHeldDonations(tx, postId) {
+  const post = await tx.rescuePost.findUnique({
+    where: { id: postId },
+    select: { id: true, title: true, donationReceived: true, assignedVolunteerId: true },
+  })
+  if (!post || post.assignedVolunteerId || post.donationReceived === 0) return { amount: 0, count: 0 }
+
+  const donations = await tx.donation.findMany({
+    where: { rescuePostId: post.id, volunteerId: null, payment: { status: "COMPLETED" } },
+    select: { id: true, amount: true, donorId: true, rescueFundId: true, paymentId: true },
+  })
+
+  // the post's total and its donations must agree, or something has already gone wrong
+  const total = donations.reduce((sum, donation) => sum + donation.amount, 0)
+  if (total !== post.donationReceived) throw new RefundMismatchError(`Post ${post.id} holds ${post.donationReceived} but its donations add up to ${total}`)
+
+  for (const donation of donations) {
+    const fromFund = Boolean(donation.rescueFundId)
+
+    const transaction = await tx.financialTransaction.create({
+      data: {
+        type: "REFUND",
+        source: "RESCUE_POST",
+        destination: fromFund ? "PAWAID_FUND" : "WALLET",
+        amount: donation.amount,
+        relatedUserId: donation.donorId,
+        relatedPostId: post.id,
+        paymentId: donation.paymentId,
+        rescueFundId: donation.rescueFundId,
+        status: "COMPLETED",
+        reference: `Refund: ${post.title} was closed before a volunteer took it`,
+      },
+    })
+
+    if (fromFund) {
+      await refundFund(tx, donation.amount)
+    } else {
+      const wallet = await tx.wallet.findUnique({ where: { userId: donation.donorId }, select: { id: true } })
+      await creditWallet(tx, {
+        walletId: wallet.id,
+        amount: donation.amount,
+        transactionId: transaction.id,
+        reference: `Refund for ${post.title}`,
+      })
+    }
+
+    // the original payment and ledger rows stay; the refund is its own entry
+    await tx.payment.update({ where: { id: donation.paymentId }, data: { status: "REFUNDED" } })
+  }
+
+  await tx.rescuePost.update({ where: { id: post.id }, data: { donationReceived: 0 } })
+
+  return { amount: total, count: donations.length }
 }

@@ -24,8 +24,15 @@ export default function PostsTab({ areas, onChange }) {
 
   const changeStatus = async (post, next) => {
     if (next === post.status) return;
-    if (next === "CANCELLED" && !confirm(`Take down "${post.title}"? It will be hidden from the feed and its open reports resolved.`)) {
-      return;
+
+    // nobody can claim a post once it leaves OPEN, so the money it is holding goes back to its donors
+    const refunds = !post.assignedVolunteer && next !== "OPEN" && post.donationReceived > 0;
+    const refundNote = refunds ? ` The ${taka(post.donationReceived)} it has raised will be refunded to its donors.` : "";
+
+    if (next === "CANCELLED") {
+      if (!confirm(`Take down "${post.title}"? It will be hidden from the feed and its open reports resolved.${refundNote}`)) return;
+    } else if (refunds) {
+      if (!confirm(`Move "${post.title}" to ${POST_STATUS[next].label}? No volunteer will be able to take it.${refundNote}`)) return;
     }
 
     try {
@@ -33,6 +40,7 @@ export default function PostsTab({ areas, onChange }) {
       const res = await api.patch(`/admin/posts/${post.id}/status`, { status: next });
       list.replaceItem(res.data.data);
       onChange();
+      if (res.data.refund?.count > 0) alert(res.data.message);
     } catch (err) {
       console.error(err);
       alert(errorMessage(err, "Failed to update post"));

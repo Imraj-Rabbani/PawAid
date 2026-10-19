@@ -1,7 +1,10 @@
 import { prisma } from "../../db.js";
+import { NOT_REFUNDED } from "../donation/donation.controller.js";
 
-// donations made by people, as opposed to by the PawAid Fund
-const fromCommunity = { donorId: { not: null } };
+// donations made by people, as opposed to by the PawAid Fund; refunded ones
+// (from rescues closed before a volunteer took them) no longer count
+const fromCommunity = { donorId: { not: null }, ...NOT_REFUNDED };
+const fromFund = { rescueFundId: { not: null }, ...NOT_REFUNDED };
 
 
 // Public financial overview (PRD §19, §41). Aggregates only: nothing here may
@@ -19,9 +22,9 @@ export async function transparencyOverview(req, res) {
       postsByStatus, fundedRescues, expenses,
       products, revenue, refunds, profit, fundGiven, fundByDestination, fundRecent,
     ] = await Promise.all([
-      prisma.financialTransaction.aggregate({ where: { ...completed, type: "DONATION" }, _sum: { amount: true }, _count: true }),
+      prisma.financialTransaction.aggregate({ where: { ...completed, ...NOT_REFUNDED, type: "DONATION" }, _sum: { amount: true }, _count: true }),
       prisma.financialTransaction.aggregate({
-        where: { ...completed, type: "DONATION", createdAt: { gte: monthStart } },
+        where: { ...completed, ...NOT_REFUNDED, type: "DONATION", createdAt: { gte: monthStart } },
         _sum: { amount: true },
         _count: true,
       }),
@@ -56,15 +59,16 @@ export async function transparencyOverview(req, res) {
         _count: true,
       }),
       prisma.financialTransaction.aggregate({
-        where: { ...completed, type: "RESCUE_FUND_ALLOCATION" },
+        // a refunded fund donation went back into the fund, so it wasn't given out
+        where: { ...completed, ...NOT_REFUNDED, type: "RESCUE_FUND_ALLOCATION" },
         _sum: { amount: true },
         _count: true,
       }),
       // what the admin chose to give to; a rescue's money still reaches its volunteer
-      prisma.donation.groupBy({ by: ["destinationType"], where: { rescueFundId: { not: null } }, _sum: { amount: true } }),
+      prisma.donation.groupBy({ by: ["destinationType"], where: fromFund, _sum: { amount: true } }),
       // the fund is the donor here, so naming who received it identifies no one's giving
       prisma.donation.findMany({
-        where: { rescueFundId: { not: null } },
+        where: fromFund,
         select: {
           id: true,
           amount: true,

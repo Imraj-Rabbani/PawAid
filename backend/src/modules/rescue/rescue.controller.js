@@ -2,6 +2,7 @@ import z from "zod";
 import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
 import { creditWallet } from "../../services/wallet.services.js";
+import { NOT_REFUNDED } from "../donation/donation.controller.js";
 
 
 const postSchema = z.object({
@@ -193,7 +194,7 @@ export async function getPost(req, res){
         // how many people gave, never who they are
         const donors = await prisma.donation.groupBy({
             by: ["donorId"],
-            where: { rescuePostId: post.id, donorId: { not: null } },
+            where: { rescuePostId: post.id, donorId: { not: null }, ...NOT_REFUNDED },
         })
 
         return res.json({ message: "Post found", data: { ...withUpvoted(post), donorCount: donors.length } })

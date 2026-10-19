@@ -58,7 +58,8 @@ export default function DonationsPage() {
 }
 
 function DonationRow({ donation }) {
-  const { amount, createdAt, donor, volunteer, rescuePost, destinationType } = donation;
+  const { amount, createdAt, donor, volunteer, rescuePost, destinationType, payment } = donation;
+  const refunded = payment?.status === "REFUNDED";
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4">
@@ -88,7 +89,14 @@ function DonationRow({ donation }) {
       </div>
 
       <div className="flex sm:flex-col items-center sm:items-end justify-between gap-1 shrink-0">
-        <p className="font-semibold text-green-600">৳{amount.toLocaleString()}</p>
+        {refunded ? (
+          <p className="font-semibold text-gray-400" title="The rescue closed before a volunteer took it, so this was refunded">
+            <span className="line-through">৳{amount.toLocaleString()}</span>
+            <span className="ml-1.5 text-[11px] font-medium no-underline">Refunded</span>
+          </p>
+        ) : (
+          <p className="font-semibold text-green-600">৳{amount.toLocaleString()}</p>
+        )}
         <p className="text-xs text-gray-400">{new Date(createdAt).toLocaleDateString()}</p>
       </div>
     </li>

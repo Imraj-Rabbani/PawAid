@@ -5,6 +5,8 @@ import api from "../../services/api";
 const PAYMENT_STYLES = {
   COMPLETED: "bg-green-100 text-green-700",
   PENDING: "bg-yellow-100 text-yellow-700",
+  // the rescue was closed before a volunteer took it, so the money went back
+  REFUNDED: "bg-gray-100 text-gray-600",
 };
 
 export default function DonationsTab({ isVolunteer }) {

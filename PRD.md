@@ -454,7 +454,8 @@ The volunteer's total donations received are visible publicly.
 - A post cannot receive donations if its assigned volunteer has been revoked.
 - Donation amounts are whole taka, between ৳1 and ৳1,000,000.
 - Donation money cannot be withdrawn as cash.
-- Donations cannot be refunded through the initial system.
+- Donations cannot be refunded, with one exception: if an admin moves a rescue post that has no volunteer out of `OPEN` (take down, Closed or Resolved), nobody can claim it any more, so every donation it is holding is refunded automatically. A user's donation goes back to their wallet; a PawAid Fund donation goes back to the fund. Refunded donations stay in the history, marked refunded, and no longer count towards any total.
+- Once a volunteer has the rescue, its donations are in their wallet and are not refunded, even if the post is later taken down.
 - Volunteers can use wallet funds only within the PawAid marketplace.
 - Volunteers can transfer wallet funds to other volunteers.
 
@@ -714,7 +715,8 @@ INCOME                  wallet top up
 DONATION                user → rescue post or volunteer
 TRANSFER                volunteer → volunteer, and unassigned post funds → volunteer on assignment
 ORDER_PAYMENT           marketplace purchase (wallet or cash on delivery)
-REFUND                  cancelled wallet order refunded to the buyer's wallet
+REFUND                  cancelled wallet order refunded to the buyer's wallet, or a donation
+                        refunded from a post closed before a volunteer took it (§11)
 MARKETPLACE_PROFIT      delivered order's profit → PawAid Fund
 RESCUE_FUND_ALLOCATION  PawAid Fund → volunteer or rescue post
 EXPENSE                 reserved, not used yet
@@ -892,7 +894,9 @@ Admins can:
 - Review post creators
 - Monitor rescue activity
 
-Taking a post down sets its status to `CANCELLED`. The post leaves the public feed and volunteer profiles but stays in the database, so its donations and financial records are untouched. The creator and admins can still open it.
+Taking a post down sets its status to `CANCELLED`. The post leaves the public feed and volunteer profiles but stays in the database, so its financial records are kept. The creator and admins can still open it.
+
+If the post had no volunteer, the money it was holding is refunded to its donors (§11), and the admin is told how much before confirming. If it had a volunteer, the money stays in their wallet.
 
 ---
 

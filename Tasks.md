@@ -78,7 +78,8 @@ This is the first user-visible feature. Wallet balance and donation totals on th
 - [~] Image upload via R2 (up to 5 images per post)
 - [x] Comments (create, paginated list, delete by author or admin)
 - [~] Post reporting (create report, admin review queue with PENDING/REVIEWED/RESOLVED/**REJECTED**) (PRD D9)
-- [x] Admin moderation: take down = status `CANCELLED`, financial records untouched (PRD D10)
+- [x] Admin moderation: take down = status `CANCELLED`, financial records kept (PRD D10)
+- [x] Refund held donations when an admin moves a post with no volunteer out of `OPEN` (take down, Closed, Resolved); refunded donations excluded from all totals (PRD §11, §26)
 - [x] Post status lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED`, plus `CLOSED`/`CANCELLED` (PRD D6)
 
 **Added beyond the plan:**
