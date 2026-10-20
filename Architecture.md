@@ -84,8 +84,9 @@ PawAid/
 │       │   ├── admin.middleware.js        # requireAdmin
 │       │   ├── volunteer.middleware.js    # requireActiveVolunteer
 │       │   ├── idempotency.middleware.js  # requireIdempotencyKey, cleanupIdempotencyKeys
-│       │   └── upload.middleware.js       # multer: images only, 5 MB
+│       │   └── upload.middleware.js       # multer + magic-byte check: JPEG/PNG/GIF/WebP, 5 MB
 │       ├── services/
+│       │   ├── audit.services.js    # logAdminAction, changedFields
 │       │   ├── wallet.services.js   # creditWallet, debitWallet
 │       │   ├── fund.services.js     # PawAid Fund: creditFund, debitFund, refundFund
 │       │   ├── payment.services.js  # simulated external provider (not wired in)
@@ -185,7 +186,7 @@ Static paths like `/rescue-post/mine` and `/volunteer/profile` are registered be
 
 ### 4.4 Uploads
 
-`upload.middleware.js` keeps files in memory (multer), allows only `image/*` MIME types and caps each file at 5 MB. Each route sets its own file count. Controllers run their permission checks *before* uploading, so a rejected request never writes to R2, then call `uploadToR2(buffer, key, contentType)`, which returns the public URL that gets stored in the database. Keys are prefixed by kind: `rescue-posts/`, `rescue-updates/`, `rescue-expenses/`, `products/`, and so on.
+`upload.middleware.js` keeps files in memory (multer) and caps each file at 5 MB. It accepts JPEG, PNG, GIF and WebP only, decided by the file's magic bytes rather than the client's declared MIME type, and then overwrites `file.mimetype` with the detected type, so the R2 key extension and `ContentType` the controllers derive from it can be trusted. SVG is rejected because it can carry scripts. Each route sets its own file count. Controllers run their permission checks *before* uploading, so a rejected request never writes to R2, then call `uploadToR2(buffer, key, contentType)`, which returns the public URL that gets stored in the database. Keys are prefixed by kind: `rescue-posts/`, `rescue-updates/`, `rescue-expenses/`, `products/`, and so on.
 
 ---
 
@@ -271,9 +272,20 @@ Money enters the platform only through the simulated wallet top up (`DUMMY_TOP_U
 
 ---
 
+### 5.6 Admin audit log
+
+Every admin write calls `logAdminAction(tx, adminId, { action, targetType, targetId, summary, details })` inside the same `prisma.$transaction` as the change, so the change and its `AdminAuditLog` row are saved together or not at all. A rejected request (validation, 404, 409, fund shortfall) writes nothing.
+
+- `summary` is the readable line shown in the admin panel; `details` holds before/after values (`{ from, to }`, or `{ changes: { field: { from, to } } }` for products).
+- `targetId` has no foreign key, so history survives the target (a deleted area keeps its entries).
+- The migration adds a trigger that rejects `UPDATE` and `DELETE` on `admin_audit_logs`, and there is no API to edit or remove entries.
+- `GET /admin/audit-logs` (filters: `action`, `targetType`, `targetId`, `adminId`, `search`) feeds the Audit Log tab.
+
+---
+
 ## 6. Data Model
 
-22 Prisma models, grouped:
+23 Prisma models, grouped:
 
 | Group | Models |
 |---|---|
@@ -281,7 +293,7 @@ Money enters the platform only through the simulated wallet top up (`DUMMY_TOP_U
 | Community | `RescuePost`, `RescuePostImage`, `RescueUpdate`, `RescueUpdateImage`, `Comment`, `PostUpvote` (unique per user + post), `PostReport` |
 | Money | `Wallet` (one per user), `WalletTransaction`, `Payment`, `FinancialTransaction`, `Donation`, `RescueFund`, `RescueExpense` |
 | Marketplace | `ProductCategory`, `Product`, `Order`, `OrderItem` |
-| Infrastructure | `IdempotencyKey` |
+| Infrastructure | `IdempotencyKey`, `AdminAuditLog` (append only) |
 
 Conventions:
 - UUID primary keys (`@db.Uuid`); snake_case table and column names through `@@map` / `@map`.
@@ -353,8 +365,6 @@ npm run dev                  # API on :3000 and Vite on :5173, side by side
 ## 9. Known Gaps
 
 - **No automated tests.** `backend/tests/` is empty and there is no reconciliation check that wallet balances equal the sum of their wallet transactions.
-- **No audit log** for admin actions, beyond what the financial ledger records.
 - **`JWT_SECRET` has an insecure fallback**, and there is **no rate limiting** on sign in or money-moving routes.
-- **Uploads are checked by declared MIME type only**, not by inspecting the file's contents.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.
 - **Validation is per controller.** A few older endpoints (volunteer apply/update, profile update) validate by hand instead of with Zod.

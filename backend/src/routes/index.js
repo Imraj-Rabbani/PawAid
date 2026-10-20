@@ -9,7 +9,7 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import {
-    createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts,
+    createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts, listAuditLogs,
     listCategories, listOrders, listReports, listTransactions, listUsers, listVolunteers, renameArea, updateOrderStatus,
     updatePostStatus, updateProduct, updateReportStatus, updateUserStatus, updateVolunteerStatus,
 } from "../modules/admin/admin.controller.js";
@@ -95,6 +95,7 @@ router.patch("/admin/products/:productId", upload.single("image"), updateProduct
 router.get("/admin/orders", listOrders)
 router.patch("/admin/orders/:orderId/status", updateOrderStatus)
 router.post("/admin/fund/donations", requireIdempotencyKey, donateFromFund)
+router.get("/admin/audit-logs", listAuditLogs)
 
 
 router.get("/volunteer", volunteers)

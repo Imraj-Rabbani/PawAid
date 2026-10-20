@@ -82,6 +82,38 @@ export const PAYMENT_METHOD = {
   WALLET: { label: "Wallet" },
 };
 
+// every action the audit log records
+export const AUDIT_ACTION = {
+  USER_SUSPENDED: { label: "User suspended", tone: "danger" },
+  USER_REACTIVATED: { label: "User reactivated", tone: "success" },
+  VOLUNTEER_REVOKED: { label: "Volunteer revoked", tone: "danger" },
+  VOLUNTEER_RESTORED: { label: "Volunteer restored", tone: "success" },
+  POST_STATUS_CHANGED: { label: "Post status", tone: "info" },
+  POST_TAKEN_DOWN: { label: "Post taken down", tone: "danger" },
+  REPORT_STATUS_CHANGED: { label: "Report", tone: "info" },
+  AREA_CREATED: { label: "Area added", tone: "success" },
+  AREA_RENAMED: { label: "Area renamed", tone: "info" },
+  AREA_DELETED: { label: "Area deleted", tone: "danger" },
+  CATEGORY_CREATED: { label: "Category added", tone: "success" },
+  PRODUCT_CREATED: { label: "Product added", tone: "success" },
+  PRODUCT_UPDATED: { label: "Product updated", tone: "info" },
+  ORDER_STATUS_CHANGED: { label: "Order status", tone: "warning" },
+  FUND_DONATION: { label: "Fund donation", tone: "warning" },
+};
+
+// keyed by the ?targetType= filter the audit log endpoint takes
+export const AUDIT_TARGET = {
+  USER: { label: "Users" },
+  VOLUNTEER: { label: "Volunteers" },
+  RESCUE_POST: { label: "Posts" },
+  POST_REPORT: { label: "Reports" },
+  RESCUE_AREA: { label: "Areas" },
+  PRODUCT_CATEGORY: { label: "Categories" },
+  PRODUCT: { label: "Products" },
+  ORDER: { label: "Orders" },
+  DONATION: { label: "Fund donations" },
+};
+
 // keyed by the ?status= filter the products endpoint takes
 export const PRODUCT_STATUS = {
   active: { label: "Active", tone: "success" },

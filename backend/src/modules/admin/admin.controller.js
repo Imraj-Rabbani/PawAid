@@ -5,6 +5,7 @@ import { creditWallet } from "../../services/wallet.services.js";
 import { creditFund, PAWAID_FUND_ID } from "../../services/fund.services.js";
 import { orderNumber } from "../order/order.controller.js";
 import { NOT_REFUNDED, refundHeldDonations } from "../donation/donation.controller.js";
+import { changedFields, logAdminAction, statusText } from "../../services/audit.services.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -200,7 +201,7 @@ export async function updateUserStatus(req, res) {
 
         const user = await prisma.user.findUnique({
             where: { id: userId.data },
-            select: { id: true, role: true },
+            select: { id: true, role: true, status: true, name: true, email: true },
         })
         if (!user) {
             return res.status(404).json({ message: "User not found" })
@@ -210,14 +211,26 @@ export async function updateUserStatus(req, res) {
             return res.status(403).json({ message: "Admins cannot be suspended" })
         }
 
-        const updated = await prisma.user.update({
-            where: { id: user.id },
-            data: { status: parsed.data.status },
-            select: adminUserSelect,
+        const suspending = parsed.data.status === "SUSPENDED"
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const updated = await tx.user.update({
+                where: { id: user.id },
+                data: { status: parsed.data.status },
+                select: adminUserSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: suspending ? "USER_SUSPENDED" : "USER_REACTIVATED",
+                targetType: "USER",
+                targetId: user.id,
+                summary: `${suspending ? "Suspended" : "Reactivated"} ${user.name} (${user.email})`,
+                details: { from: user.status, to: parsed.data.status },
+            })
+            return updated
         })
 
         return res.json({
-            message: parsed.data.status === "SUSPENDED" ? "User suspended" : "User reactivated",
+            message: suspending ? "User suspended" : "User reactivated",
             data: updated,
         })
     } catch (error) {
@@ -311,13 +324,28 @@ export async function updateVolunteerStatus(req, res) {
         const parsed = volunteerStatusSchema.safeParse(req.body ?? {})
         if (!parsed.success) return validationError(res, parsed)
 
-        const volunteer = await prisma.volunteerProfile.update({
-            where: { id: volunteerId.data },
-            data: { status: parsed.data.status },
-            select: adminVolunteerSelect,
-        }).catch((error) => {
-            if (error.code === "P2025") return null
-            throw error
+        const revoking = parsed.data.status === "SUSPENDED"
+
+        const volunteer = await prisma.$transaction(async (tx) => {
+            const current = await tx.volunteerProfile.findUnique({
+                where: { id: volunteerId.data },
+                select: { id: true, status: true, user: { select: { name: true } } },
+            })
+            if (!current) return null
+
+            const volunteer = await tx.volunteerProfile.update({
+                where: { id: current.id },
+                data: { status: parsed.data.status },
+                select: adminVolunteerSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: revoking ? "VOLUNTEER_REVOKED" : "VOLUNTEER_RESTORED",
+                targetType: "VOLUNTEER",
+                targetId: current.id,
+                summary: `${revoking ? "Revoked" : "Restored"} volunteer status for ${current.user.name}`,
+                details: { from: current.status, to: parsed.data.status },
+            })
+            return volunteer
         })
 
         if (!volunteer) {
@@ -325,7 +353,7 @@ export async function updateVolunteerStatus(req, res) {
         }
 
         return res.json({
-            message: parsed.data.status === "SUSPENDED" ? "Volunteer status revoked" : "Volunteer status restored",
+            message: revoking ? "Volunteer status revoked" : "Volunteer status restored",
             data: volunteer,
         })
     } catch (error) {
@@ -429,7 +457,7 @@ export async function updatePostStatus(req, res) {
 
         const post = await prisma.rescuePost.findUnique({
             where: { id: postId.data },
-            select: { id: true, assignedVolunteerId: true },
+            select: { id: true, title: true, status: true, assignedVolunteerId: true },
         })
         if (!post) {
             return res.status(404).json({ message: "Post not found" })
@@ -452,18 +480,28 @@ export async function updatePostStatus(req, res) {
             if (count === 0) throw new PostChangedError()
 
             // taking a post down settles every open report on it
-            if (status === "CANCELLED") {
-                await tx.postReport.updateMany({
+            const settled = status === "CANCELLED"
+                ? await tx.postReport.updateMany({
                     where: { postId: post.id, status: { in: ["PENDING", "REVIEWED"] } },
                     data: { status: "RESOLVED" },
                 })
-            }
+                : { count: 0 }
 
             // only an OPEN post can be claimed, so money held by a post that leaves OPEN
             // without a volunteer would be stuck: give it back to the donors
             const refund = !post.assignedVolunteerId && status !== "OPEN"
                 ? await refundHeldDonations(tx, post.id)
                 : { amount: 0, count: 0 }
+
+            await logAdminAction(tx, req.user.id, {
+                action: status === "CANCELLED" ? "POST_TAKEN_DOWN" : "POST_STATUS_CHANGED",
+                targetType: "RESCUE_POST",
+                targetId: post.id,
+                summary: status === "CANCELLED"
+                    ? `Took down "${post.title}"`
+                    : `Changed "${post.title}" from ${statusText(post.status)} to ${statusText(status)}`,
+                details: { from: post.status, to: status, reportsResolved: settled.count, refund },
+            })
 
             const updated = await tx.rescuePost.findUnique({ where: { id: post.id }, select: adminPostSelect })
             return { updated, refund }
@@ -557,13 +595,26 @@ export async function updateReportStatus(req, res) {
         const parsed = reportStatusSchema.safeParse(req.body ?? {})
         if (!parsed.success) return validationError(res, parsed)
 
-        const report = await prisma.postReport.update({
-            where: { id: reportId.data },
-            data: { status: parsed.data.status },
-            select: adminReportSelect,
-        }).catch((error) => {
-            if (error.code === "P2025") return null
-            throw error
+        const report = await prisma.$transaction(async (tx) => {
+            const current = await tx.postReport.findUnique({
+                where: { id: reportId.data },
+                select: { id: true, status: true, reason: true, post: { select: { title: true } } },
+            })
+            if (!current) return null
+
+            const report = await tx.postReport.update({
+                where: { id: current.id },
+                data: { status: parsed.data.status },
+                select: adminReportSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: "REPORT_STATUS_CHANGED",
+                targetType: "POST_REPORT",
+                targetId: current.id,
+                summary: `Marked a "${current.reason}" report on "${current.post.title}" as ${statusText(parsed.data.status)}`,
+                details: { from: current.status, to: parsed.data.status },
+            })
+            return report
         })
 
         if (!report) {
@@ -616,19 +667,33 @@ export async function renameArea(req, res) {
         const parsed = areaSchema.safeParse(req.body ?? {})
         if (!parsed.success) return validationError(res, parsed)
 
-        const area = await prisma.rescueArea.update({
-            where: { id: areaId.data },
-            data: { name: parsed.data.name },
-            select: adminAreaSelect,
+        const area = await prisma.$transaction(async (tx) => {
+            const current = await tx.rescueArea.findUnique({ where: { id: areaId.data }, select: { id: true, name: true } })
+            if (!current) return null
+
+            const area = await tx.rescueArea.update({
+                where: { id: current.id },
+                data: { name: parsed.data.name },
+                select: adminAreaSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: "AREA_RENAMED",
+                targetType: "RESCUE_AREA",
+                targetId: current.id,
+                summary: `Renamed area "${current.name}" to "${area.name}"`,
+                details: { from: current.name, to: area.name },
+            })
+            return area
         })
+
+        if (!area) {
+            return res.status(404).json({ message: "Area not found" })
+        }
 
         return res.json({ message: "Area renamed", data: area })
     } catch (error) {
         if (error.code === "P2002") {
             return res.status(409).json({ message: "Area already exists" })
-        }
-        if (error.code === "P2025") {
-            return res.status(404).json({ message: "Area not found" })
         }
         console.error(error);
         res.status(500).json({ message: "Failed to rename area" });
@@ -655,7 +720,16 @@ export async function deleteArea(req, res) {
             return res.status(409).json({ message: "This area is in use by volunteers or posts and cannot be deleted" })
         }
 
-        await prisma.rescueArea.delete({ where: { id: area.id } })
+        await prisma.$transaction(async (tx) => {
+            await tx.rescueArea.delete({ where: { id: area.id } })
+            await logAdminAction(tx, req.user.id, {
+                action: "AREA_DELETED",
+                targetType: "RESCUE_AREA",
+                targetId: area.id,
+                summary: `Deleted area "${area.name}"`,
+                details: { name: area.name },
+            })
+        })
 
         return res.json({ message: "Area deleted" })
     } catch (error) {
@@ -702,9 +776,19 @@ export async function createCategory(req, res) {
         const parsed = categorySchema.safeParse(req.body ?? {})
         if (!parsed.success) return validationError(res, parsed)
 
-        const category = await prisma.productCategory.create({
-            data: { name: parsed.data.name },
-            select: adminCategorySelect,
+        const category = await prisma.$transaction(async (tx) => {
+            const category = await tx.productCategory.create({
+                data: { name: parsed.data.name },
+                select: adminCategorySelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: "CATEGORY_CREATED",
+                targetType: "PRODUCT_CATEGORY",
+                targetId: category.id,
+                summary: `Added category "${category.name}"`,
+                details: { name: category.name },
+            })
+            return category
         })
 
         return res.status(201).json({ message: "Category added", data: category })
@@ -839,9 +923,19 @@ export async function createProduct(req, res) {
         // checked above first so a rejected request doesn't upload anything
         const imageUrl = req.file ? await uploadProductImage(req.file) : null
 
-        const product = await prisma.product.create({
-            data: { ...data, imageUrl },
-            select: adminProductSelect,
+        const product = await prisma.$transaction(async (tx) => {
+            const product = await tx.product.create({
+                data: { ...data, imageUrl },
+                select: adminProductSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: "PRODUCT_CREATED",
+                targetType: "PRODUCT",
+                targetId: product.id,
+                summary: `Added product "${product.name}"`,
+                details: { ...data, imageUrl },
+            })
+            return product
         })
 
         return res.status(201).json({ message: "Product added", data: product })
@@ -867,7 +961,10 @@ export async function updateProduct(req, res) {
 
         const product = await prisma.product.findUnique({
             where: { id: productId.data },
-            select: { id: true, costPrice: true, sellingPrice: true },
+            select: {
+                id: true, name: true, description: true, imageUrl: true, categoryId: true,
+                costPrice: true, sellingPrice: true, stockQty: true, active: true,
+            },
         })
         if (!product) {
             return res.status(404).json({ message: "Product not found" })
@@ -884,15 +981,28 @@ export async function updateProduct(req, res) {
 
         const imageUrl = req.file ? await uploadProductImage(req.file) : undefined
 
-        const updated = await prisma.product.update({
-            where: { id: product.id },
-            data: { ...data, imageUrl },
-            select: adminProductSelect,
-        })
-
-        const message = Object.keys(data).length === 1 && data.active !== undefined
+        const onlyActive = Object.keys(data).length === 1 && data.active !== undefined
+        const message = onlyActive
             ? (data.active ? "Product activated" : "Product deactivated")
             : "Product updated"
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const updated = await tx.product.update({
+                where: { id: product.id },
+                data: { ...data, imageUrl },
+                select: adminProductSelect,
+            })
+            await logAdminAction(tx, req.user.id, {
+                action: "PRODUCT_UPDATED",
+                targetType: "PRODUCT",
+                targetId: product.id,
+                summary: onlyActive
+                    ? `${data.active ? "Activated" : "Deactivated"} product "${product.name}"`
+                    : `Updated product "${product.name}"`,
+                details: { changes: changedFields(product, { ...data, imageUrl }) },
+            })
+            return updated
+        })
 
         return res.json({ message, data: updated })
     } catch (error) {
@@ -1067,8 +1177,9 @@ export async function updateOrderStatus(req, res) {
 
             // a delivered order is a final sale, so its profit goes into the PawAid Fund.
             // DELIVERED can only be reached once (the claim above), so it is never paid twice
+            let profit = 0
             if (status === "DELIVERED") {
-                const profit = order.items.reduce(
+                profit = order.items.reduce(
                     (sum, item) => sum + Math.max(item.unitPrice - item.unitCost, 0) * item.quantity,
                     0,
                 )
@@ -1124,6 +1235,19 @@ export async function updateOrderStatus(req, res) {
                     })
                 }
             }
+
+            await logAdminAction(tx, req.user.id, {
+                action: "ORDER_STATUS_CHANGED",
+                targetType: "ORDER",
+                targetId: order.id,
+                summary: `Changed order #${number} from ${statusText(order.status)} to ${statusText(status)}`,
+                details: {
+                    from: order.status,
+                    to: status,
+                    ...(profit > 0 && { profitToFund: profit }),
+                    ...(refunded && { refundedToWallet: order.totalAmount }),
+                },
+            })
 
             return tx.order.findUnique({ where: { id: order.id }, select: adminOrderSelect })
         }, { maxWait: 10000, timeout: 20000 })
@@ -1194,5 +1318,70 @@ export async function listTransactions(req, res) {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+}
+
+
+// ========================================
+// AUDIT LOG (read only, PRD §39)
+// ========================================
+
+const ADMIN_ACTIONS = [
+    "USER_SUSPENDED", "USER_REACTIVATED", "VOLUNTEER_REVOKED", "VOLUNTEER_RESTORED", "POST_STATUS_CHANGED",
+    "POST_TAKEN_DOWN", "REPORT_STATUS_CHANGED", "AREA_CREATED", "AREA_RENAMED", "AREA_DELETED", "CATEGORY_CREATED",
+    "PRODUCT_CREATED", "PRODUCT_UPDATED", "ORDER_STATUS_CHANGED", "FUND_DONATION",
+]
+const AUDIT_TARGET_TYPES = [
+    "USER", "VOLUNTEER", "RESCUE_POST", "POST_REPORT", "RESCUE_AREA", "PRODUCT_CATEGORY", "PRODUCT", "ORDER", "DONATION",
+]
+
+export async function listAuditLogs(req, res) {
+    try {
+        const paging = pageParams(req.query)
+        const search = searchTerm(req.query)
+        const adminId = z.uuid().safeParse(req.query.adminId)
+        const targetId = z.uuid().safeParse(req.query.targetId)
+
+        const where = {
+            action: enumFilter(ADMIN_ACTIONS, req.query.action),
+            targetType: enumFilter(AUDIT_TARGET_TYPES, req.query.targetType),
+            ...(adminId.success && { adminId: adminId.data }),
+            ...(targetId.success && { targetId: targetId.data }),
+            ...(search && {
+                OR: [
+                    { summary: { contains: search, mode: "insensitive" } },
+                    { admin: { name: { contains: search, mode: "insensitive" } } },
+                ],
+            }),
+        }
+
+        const [logs, total] = await Promise.all([
+            prisma.adminAuditLog.findMany({
+                where,
+                select: {
+                    id: true,
+                    action: true,
+                    targetType: true,
+                    targetId: true,
+                    summary: true,
+                    details: true,
+                    createdAt: true,
+                    admin: { select: { ...publicUserSelect, email: true } },
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                skip: paging.skip,
+                take: paging.limit,
+            }),
+            prisma.adminAuditLog.count({ where }),
+        ])
+
+        return res.json({
+            message: "Audit log listed",
+            data: logs,
+            pagination: pageInfo(paging, total),
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to fetch the audit log" });
     }
 }

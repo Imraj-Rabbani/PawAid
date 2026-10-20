@@ -228,9 +228,9 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Deliverables:**
 
-- [ ] Audit logs for sensitive admin actions (revoke, suspend, take down, product changes, order status, fund donations)
+- [x] Audit logs for admin actions: every admin write (suspend, revoke, post status / take down, reports, areas, categories, products, order status, fund donations) writes an `AdminAuditLog` row in the same transaction; the table is append only (DB trigger) and shown in the admin panel's Audit Log tab
 - [x] Duplicate-payment prevention: `Idempotency-Key` required on top up, donations, transfers, checkout and fund donations (PRD D22)
-- [~] File upload validation: images only, 5 MB, per-route file counts. Still to do: check file contents (magic bytes), not just the declared MIME type
+- [x] File upload validation: JPEG, PNG, GIF or WebP only, checked by magic bytes (the declared MIME type is not trusted), 5 MB, per-route file counts; the frontend pickers check the type too
 - [x] NID never appears in any public or list response (admin volunteer list only)
 - [x] Every multi-step financial operation wrapped in a DB transaction
 - [ ] End-to-end test of the full MVP success flow (PRD §43): register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview

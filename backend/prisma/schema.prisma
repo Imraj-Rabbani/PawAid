@@ -110,6 +110,36 @@ enum FinancialTransactionStatus {
   FAILED
   CANCELLED
 }
+
+enum AdminAction {
+  USER_SUSPENDED
+  USER_REACTIVATED
+  VOLUNTEER_REVOKED
+  VOLUNTEER_RESTORED
+  POST_STATUS_CHANGED
+  POST_TAKEN_DOWN
+  REPORT_STATUS_CHANGED
+  AREA_CREATED
+  AREA_RENAMED
+  AREA_DELETED
+  CATEGORY_CREATED
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  ORDER_STATUS_CHANGED
+  FUND_DONATION
+}
+
+enum AuditTargetType {
+  USER
+  VOLUNTEER
+  RESCUE_POST
+  POST_REPORT
+  RESCUE_AREA
+  PRODUCT_CATEGORY
+  PRODUCT
+  ORDER
+  DONATION
+}
 // ========================================
 // USER
 // ========================================
@@ -136,6 +166,7 @@ model User {
   orders Order[]
   financialTransactions FinancialTransaction[] @relation("RelatedUser")
   idempotencyKeys IdempotencyKey[]
+  adminAuditLogs AdminAuditLog[]
   @@map("users")
 }
 // ========================================
@@ -560,4 +591,29 @@ model IdempotencyKey {
   @@unique([userId, key])
   @@index([createdAt])
   @@map("idempotency_keys")
+}
+
+// ========================================
+// ADMIN AUDIT LOG
+// ========================================
+
+// One row per admin action (PRD §39), written in the same transaction as the
+// change it records. Append only: the migration adds a trigger that rejects
+// UPDATE and DELETE. targetId has no foreign key so an entry outlives its
+// target (a deleted area keeps its history); summary is the readable line
+// shown in the admin panel, details holds the before/after values.
+model AdminAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  adminId String @map("admin_id") @db.Uuid
+  action AdminAction
+  targetType AuditTargetType @map("target_type")
+  targetId String @map("target_id") @db.Uuid
+  summary String
+  details Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  @@index([createdAt])
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
 }

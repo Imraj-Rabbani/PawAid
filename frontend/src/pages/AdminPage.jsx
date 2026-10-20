@@ -12,6 +12,7 @@ import AreasTab from "../components/admin/AreasTab";
 import ProductsTab from "../components/admin/ProductsTab";
 import OrdersTab from "../components/admin/OrdersTab";
 import TransactionsTab from "../components/admin/TransactionsTab";
+import AuditLogTab from "../components/admin/AuditLogTab";
 import { errorMessage } from "../components/admin/adminUtils";
 
 const TABS = [
@@ -24,6 +25,7 @@ const TABS = [
   { value: "products", label: "Products", icon: "storefront" },
   { value: "orders", label: "Orders", icon: "local_shipping" },
   { value: "transactions", label: "Transactions", icon: "receipt_long" },
+  { value: "audit", label: "Audit Log", icon: "history" },
 ];
 
 export default function AdminPage() {
@@ -147,6 +149,7 @@ export default function AdminPage() {
               {tab === "products" && <ProductsTab />}
               {tab === "orders" && <OrdersTab onChange={refresh} />}
               {tab === "transactions" && <TransactionsTab />}
+              {tab === "audit" && <AuditLogTab />}
             </>
           )}
         </div>

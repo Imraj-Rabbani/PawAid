@@ -2,6 +2,7 @@ import z from "zod";
 import { prisma } from "../../db.js";
 import { creditWallet, debitWallet, InsufficientFundsError } from "../../services/wallet.services.js";
 import { debitFund, FundShortfallError, PAWAID_FUND_ID, refundFund } from "../../services/fund.services.js";
+import { logAdminAction } from "../../services/audit.services.js";
 
 // A refunded donation stays in the history but no longer counts towards any total.
 // Works on Donation and on FinancialTransaction, which both link to the payment.
@@ -468,6 +469,22 @@ export async function donateFromFund(req, res) {
           reference: post ? `PawAid Fund donation for ${post.title}` : "PawAid Fund donation",
         })
       }
+
+      await logAdminAction(tx, req.user.id, {
+        action: "FUND_DONATION",
+        targetType: "DONATION",
+        targetId: donation.id,
+        summary: post
+          ? `Donated ৳${amount.toLocaleString()} from the PawAid Fund to "${post.title}"`
+          : `Donated ৳${amount.toLocaleString()} from the PawAid Fund to ${volunteer.user.name}`,
+        details: {
+          amount,
+          destinationType,
+          rescuePostId: post?.id ?? null,
+          volunteerId: volunteer?.id ?? null,
+          financialTransactionId: transaction.id,
+        },
+      })
 
       return donation
     }, { maxWait: 10000, timeout: 20000 })

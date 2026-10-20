@@ -1237,7 +1237,7 @@ Because the platform handles user identity and financial information, the backen
 - Authentication tokens (JWT, 7-day expiry, sent as a Bearer token) — **done**
 - Role-based authorization (admin and active-volunteer middleware) — **done**
 - Input validation (Zod) — **done**
-- File upload validation: images only, 5 MB limit, file count per route — **done**
+- File upload validation: JPEG, PNG, GIF or WebP checked by file contents, 5 MB limit, file count per route — **done**
 - NID data protection: never in public responses — **done**
 - Secure payment handling — simulated (§23)
 - Transaction authorization — **done**
@@ -1245,7 +1245,7 @@ Because the platform handles user identity and financial information, the backen
 - Prevention of unauthorized wallet access — **done**
 - Database transaction consistency, including atomic balance checks — **done**
 - Suspended accounts are signed out on their next request — **done**
-- Audit logs for sensitive administrative actions — **not yet built**
+- Audit logs for administrative actions (append only, viewable in the admin panel) — **done**
 
 NID information is never publicly visible on volunteer profiles. Contact details, wallet and NID on a user profile are only visible to the owner and admins.
 
@@ -1375,7 +1375,7 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 ### Hardening
 
 - ✅ Duplicate-payment prevention
-- ⬜ Audit logs for admin actions
+- ✅ Audit logs for admin actions
 - ⬜ Automated tests (ledger reconciliation, end-to-end MVP flow)
 
 ---

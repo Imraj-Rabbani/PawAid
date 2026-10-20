@@ -3,6 +3,7 @@ import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
 import { creditWallet } from "../../services/wallet.services.js";
 import { NOT_REFUNDED } from "../donation/donation.controller.js";
+import { logAdminAction } from "../../services/audit.services.js";
 
 
 const postSchema = z.object({
@@ -53,8 +54,16 @@ export async function addArea(req, res){
             return res.status(400).json({ message: "Area name is required" })
         }
 
-        const areaCreated = await prisma.rescueArea.create({
-            data: { name }
+        const areaCreated = await prisma.$transaction(async (tx) => {
+            const area = await tx.rescueArea.create({ data: { name } })
+            await logAdminAction(tx, req.user.id, {
+                action: "AREA_CREATED",
+                targetType: "RESCUE_AREA",
+                targetId: area.id,
+                summary: `Added area "${area.name}"`,
+                details: { name: area.name },
+            })
+            return area
         })
 
         return res.status(201).json({
