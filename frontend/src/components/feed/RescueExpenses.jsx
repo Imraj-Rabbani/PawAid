@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Icon from "../Icon";
+import { IMAGE_ACCEPT, IMAGE_TYPE_ERROR, isAllowedImage } from "../../services/images";
 import ImageLightbox from "./ImageLightbox";
 import { fullTime } from "./rescueUtils";
 
@@ -284,6 +285,10 @@ function ExpenseForm({ postId, focusSignal, onRecorded }) {
     e.target.value = "";
     if (!file) return;
 
+    if (!isAllowedImage(file)) {
+      setError(IMAGE_TYPE_ERROR);
+      return;
+    }
     if (file.size > MAX_IMAGE_SIZE) {
       setError("The receipt photo must be 5MB or smaller.");
       return;
@@ -409,7 +414,7 @@ function ExpenseForm({ postId, focusSignal, onRecorded }) {
         <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-on-surface-variant bg-surface-container-lowest rounded-xl hover:bg-surface-container-high cursor-pointer">
           <Icon name="photo_camera" className="text-[18px]" />
           {receipt ? "Change Receipt" : "Add Receipt"}
-          <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+          <input type="file" accept={IMAGE_ACCEPT} onChange={handleFile} className="hidden" />
         </label>
         <button
           type="submit"

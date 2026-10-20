@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../../services/api";
 import Icon from "../Icon";
 import { errorMessage, taka } from "./adminUtils";
+import { IMAGE_ACCEPT, IMAGE_TYPE_ERROR, isAllowedImage } from "../../services/images";
 
 const inputClass =
   "w-full px-3 py-2 bg-surface-container-low border border-transparent rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none focus:ring-2 focus:ring-primary-container";
@@ -47,6 +48,11 @@ export default function ProductFormModal({ product, categories, onClose, onSaved
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isAllowedImage(file)) {
+      setError(IMAGE_TYPE_ERROR);
+      e.target.value = "";
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
       setError("Image must be 5MB or smaller");
       e.target.value = "";
@@ -122,9 +128,9 @@ export default function ProductFormModal({ product, categories, onClose, onSaved
             <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest cursor-pointer">
               <Icon name="upload" className="text-[16px]" />
               {preview ? "Change image" : "Upload image"}
-              <input type="file" accept="image/*" onChange={handleImage} className="sr-only" />
+              <input type="file" accept={IMAGE_ACCEPT} onChange={handleImage} className="sr-only" />
             </label>
-            <p className="mt-1 text-xs text-on-surface-variant">Optional · JPG, PNG or WebP up to 5MB</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Optional · JPG, PNG, GIF or WebP up to 5MB</p>
           </div>
         </div>
 

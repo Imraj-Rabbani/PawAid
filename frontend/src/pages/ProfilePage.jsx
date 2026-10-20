@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import api, { updateStoredUser } from "../services/api";
+import { IMAGE_TYPE_ERROR, isAllowedImage } from "../services/images";
 import Sidebar from "../components/profile/Sidebar";
 import ProfileTab from "../components/profile/ProfileTab";
 import DonationsTab from "../components/profile/DonationsTab";
@@ -41,6 +42,11 @@ export default function ProfilePage() {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!isAllowedImage(file)) {
+      alert(IMAGE_TYPE_ERROR);
+      e.target.value = "";
+      return;
+    }
 
     setPreview(URL.createObjectURL(file));
 

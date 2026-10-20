@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Icon from "../Icon";
+import { IMAGE_ACCEPT, IMAGE_TYPE_ERROR, isAllowedImage } from "../../services/images";
 import ImageLightbox from "./ImageLightbox";
 import { fullTime } from "./rescueUtils";
 
@@ -193,6 +194,10 @@ function UpdateComposer({ postId, focusSignal, onPosted }) {
     const selected = Array.from(e.target.files);
     e.target.value = "";
 
+    if (!selected.every(isAllowedImage)) {
+      setError(IMAGE_TYPE_ERROR);
+      return;
+    }
     if (selected.some((file) => file.size > MAX_IMAGE_SIZE)) {
       setError("Each photo must be 5MB or smaller.");
       return;
@@ -280,7 +285,7 @@ function UpdateComposer({ postId, focusSignal, onPosted }) {
           Add Photos ({images.length}/{MAX_IMAGES})
           <input
             type="file"
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             multiple
             onChange={handleFiles}
             disabled={images.length >= MAX_IMAGES}

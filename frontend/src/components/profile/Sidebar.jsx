@@ -1,4 +1,5 @@
 import WalletCard from "./WalletCard";
+import { IMAGE_ACCEPT } from "../../services/images";
 
 export default function Sidebar({
     user,
@@ -32,7 +33,7 @@ export default function Sidebar({
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={IMAGE_ACCEPT}
                   onChange={onFileChange}
                   disabled={uploading}
                   className="hidden"

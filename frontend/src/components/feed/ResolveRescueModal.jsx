@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import Icon from "../Icon";
+import { IMAGE_ACCEPT, IMAGE_TYPE_ERROR, isAllowedImage } from "../../services/images";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB, same as the backend limit
 
@@ -28,6 +29,10 @@ export default function ResolveRescueModal({ post, onClose, onResolved }) {
     e.target.value = "";
     if (!file) return;
 
+    if (!isAllowedImage(file)) {
+      setError(IMAGE_TYPE_ERROR);
+      return;
+    }
     if (file.size > MAX_IMAGE_SIZE) {
       setError("The photo must be 5MB or smaller.");
       return;
@@ -118,7 +123,7 @@ export default function ResolveRescueModal({ post, onClose, onResolved }) {
           <label className="flex items-center justify-center gap-2 px-3 py-6 rounded-xl border-2 border-dashed border-outline-variant text-sm font-semibold text-on-surface-variant cursor-pointer hover:bg-surface-container-low">
             <Icon name="add_a_photo" className="text-[20px]" />
             Add a photo
-            <input type="file" accept="image/*" onChange={handleFile} className="sr-only" />
+            <input type="file" accept={IMAGE_ACCEPT} onChange={handleFile} className="sr-only" />
           </label>
         )}
 

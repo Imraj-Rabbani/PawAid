@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Icon from "../Icon";
+import { IMAGE_ACCEPT, IMAGE_TYPE_ERROR, isAllowedImage } from "../../services/images";
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB, same as the backend limit
@@ -56,6 +57,10 @@ export default function CreatePost({ user, onCreated }) {
     const selected = Array.from(e.target.files);
     e.target.value = "";
 
+    if (!selected.every(isAllowedImage)) {
+      setError(IMAGE_TYPE_ERROR);
+      return;
+    }
     if (selected.some((file) => file.size > MAX_IMAGE_SIZE)) {
       setError("Each image must be 5MB or smaller.");
       return;
@@ -252,7 +257,7 @@ export default function CreatePost({ user, onCreated }) {
           Add Photos ({images.length}/{MAX_IMAGES})
           <input
             type="file"
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             multiple
             onChange={handleFiles}
             disabled={images.length >= MAX_IMAGES}
