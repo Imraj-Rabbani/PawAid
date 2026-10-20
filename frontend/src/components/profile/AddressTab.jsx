@@ -22,7 +22,8 @@ export default function AddressTab({ user, setUser }) {
       setEditing(false);
       setSaved(true);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to save your address.");
+      const fieldErrors = Object.values(requestError.response?.data?.errors || {}).flat();
+      setError(fieldErrors[0] || requestError.response?.data?.message || "Failed to save your address.");
     } finally {
       setSaving(false);
     }

@@ -34,7 +34,7 @@ This stage has no user-facing features yet — it's the skeleton everything else
 - [~] JWT-based auth: register, login. Logout is client side (token removed from the browser); no refresh token, 7-day expiry instead (PRD D24)
 - [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
 - [x] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
-- [~] Global error handler inline in `server.js`; Zod validation done per controller rather than as shared middleware
+- [~] Global error handler inline in `server.js`. Zod body validation is shared middleware (`validateBody`, schemas in `src/schemas/`)
 
 **Key considerations:**
 

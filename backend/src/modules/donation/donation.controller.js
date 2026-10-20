@@ -8,13 +8,6 @@ import { logAdminAction } from "../../services/audit.services.js";
 // Works on Donation and on FinancialTransaction, which both link to the payment.
 export const NOT_REFUNDED = { payment: { status: { not: "REFUNDED" } } };
 
-const donationSchema = z.object({
-  amount: z
-    .number("Amount must be a number.")
-    .int("Amount must be a whole number.")
-    .min(1, "Amount must be at least 1.")
-    .max(1000000, "Amount is too large."),
-});
 
 const donationSelect = {
   id: true,
@@ -95,16 +88,8 @@ export async function myDonations(req, res) {
 
 export async function donateToVolunteer(req, res) {
   try {
-    const parsed = donationSchema.safeParse(req.body ?? {})
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { amount } = parsed.data
+    const { amount } = req.body
     const donorId = req.user.id
 
     // a malformed id makes the lookup throw, treat it the same as a missing volunteer
@@ -260,15 +245,8 @@ export async function donateToPost(req, res) {
       return res.status(404).json({ message: "Post not found" })
     }
 
-    const parsed = donationSchema.safeParse(req.body ?? {})
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
 
-    const { amount } = parsed.data
+    const { amount } = req.body
     const donorId = req.user.id
 
     const post = await prisma.rescuePost.findUnique({
@@ -383,25 +361,14 @@ export async function donateToPost(req, res) {
 // PAWAID FUND DONATIONS (admin only)
 // ========================================
 
-const fundDonationSchema = donationSchema.extend({
-  destinationType: z.enum(["VOLUNTEER", "RESCUE_POST"], "Choose a volunteer or a rescue post."),
-  targetId: z.uuid("Choose who to donate to."),
-})
 
 // An admin gives money from the PawAid Fund to a volunteer or a rescue post. It is
 // recorded as a donation with the fund as the donor, so it shows up in the donation
 // lists, and the ledger entry names the admin who made it (PRD §17, §18)
 export async function donateFromFund(req, res) {
   try {
-    const parsed = fundDonationSchema.safeParse(req.body ?? {})
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
 
-    const { amount, destinationType, targetId } = parsed.data
+    const { amount, destinationType, targetId } = req.body
     const toPost = destinationType === "RESCUE_POST"
 
     const donation = await prisma.$transaction(async (tx) => {

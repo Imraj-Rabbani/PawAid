@@ -170,12 +170,9 @@ export async function volunteerById(req, res) {
 export async function volunteerApplication(req, res) {
   try {
     const userId = req.user.id
-    const { rescueAreaId, phone, address, profilePictureUrl, description } = req.body
-    const nid = typeof req.body.nid === "string" ? req.body.nid.trim() : ""
 
-    if (!rescueAreaId || !nid) {
-      return res.status(400).json({ message: "rescueAreaId and nid are required" })
-    }
+
+    const { rescueAreaId, nid, phone, address, description } = req.body
 
     if (req.user.role === "VOLUNTEER") {
       return res.status(409).json({ message: `${req.user.name} is already a volunteer` })
@@ -185,8 +182,7 @@ export async function volunteerApplication(req, res) {
       return res.status(403).json({ message: "Only normal users can apply to be a volunteer" })
     }
 
-    // a malformed id makes the lookup throw, treat it the same as a missing area
-    const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } }).catch(() => null)
+    const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } })
     if (!area) {
       return res.status(400).json({ message: "Invalid rescue area" })
     }
@@ -197,7 +193,7 @@ export async function volunteerApplication(req, res) {
           userId,
           rescueAreaId,
           nid,
-          description: description || null,
+          description: description ?? null,
           status: "ACTIVE",
         },
       });
@@ -206,9 +202,9 @@ export async function volunteerApplication(req, res) {
         where: { id: userId },
         data: {
           role: "VOLUNTEER",
+          // a blank phone or address leaves the one on the account as it is
           phone: phone || undefined,
           address: address || undefined,
-          profilePictureUrl: profilePictureUrl || undefined,
         },
       });
 
@@ -257,20 +253,18 @@ export async function volunteer(req, res) {
 export async function updateVolunteerProfile(req, res){
   try {
     const userId = req.user.id;
-    const { rescueAreaId, nid, description } = req.body;
+
+
+    const { rescueAreaId } = req.body
 
     if (rescueAreaId) {
-      const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } }).catch(() => null);
+      const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } });
       if (!area) return res.status(400).json({ message: "Invalid rescue area" });
     }
 
     const profile = await prisma.volunteerProfile.update({
       where: { userId },
-      data: {
-        ...(rescueAreaId && { rescueAreaId }),
-        ...(nid && { nid }),
-        ...(description !== undefined && { description }),
-      },
+      data: req.body,
       include: { rescueArea: true },
     });
 

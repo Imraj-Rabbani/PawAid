@@ -2,27 +2,12 @@ import z from "zod";
 import { prisma } from "../../db.js";
 import { creditWallet, debitWallet, InsufficientFundsError } from "../../services/wallet.services.js";
 
-const topUpSchema = z.object({
-  amount: z
-    .number("Amount must be a number.")
-    .int("Amount must be a whole number.")
-    .min(1, "Amount must be at least 1.")
-    .max(1000000, "Amount is too large."),
-});
 
 
 export async function topUpWallet(req, res) {
   try {
-    const parsed = topUpSchema.safeParse(req.body ?? {})
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { amount } = parsed.data
+    const { amount } = req.body
     const userId = req.user.id
 
     const wallet = await prisma.wallet.findUnique({ where: { userId } })
@@ -164,32 +149,15 @@ export async function myWalletTransactions(req, res) {
 }
 
 
-const transferSchema = z.object({
-  volunteerId: z.uuid("Please choose a volunteer."),
-  amount: z
-    .number("Amount must be a number.")
-    .int("Amount must be a whole number.")
-    .min(1, "Amount must be at least 1.")
-    .max(1000000, "Amount is too large."),
-  note: z.string().trim().max(200, "Note is too long.").optional(),
-});
 
 // Volunteer to volunteer transfer (PRD §13). Use after requireActiveVolunteer.
 // One FinancialTransaction records sender (relatedUser), receiver (relatedVolunteer),
 // amount, time and note; each wallet gets its own DEBIT / CREDIT row.
 export async function transferToVolunteer(req, res) {
   try {
-    const parsed = transferSchema.safeParse(req.body ?? {})
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { volunteerId, amount } = parsed.data
-    const note = parsed.data.note || null
+    const { volunteerId, amount } = req.body
+    const note = req.body.note || null
     const sender = req.volunteer
 
     if (volunteerId === sender.id) {

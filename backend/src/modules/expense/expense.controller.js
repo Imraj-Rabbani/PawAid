@@ -16,18 +16,6 @@ const EXPENSE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "RESOLVED"]
 // an order that never went through isn't money spent
 const UNSPENT_ORDER_STATUSES = ["CANCELLED", "REFUNDED"]
 
-const expenseSchema = z.object({
-    // sent as multipart form data, so it arrives as a string
-    amount: z.coerce
-        .number("Amount must be a number.")
-        .int("Amount must be a whole number.")
-        .min(1, "Amount must be at least 1.")
-        .max(1000000, "Amount is too large."),
-    description: z.string("Describe what the money was spent on.").trim()
-        .min(3, "Describe what the money was spent on.")
-        .max(500, "Description is too long."),
-    orderId: z.uuid("Choose a valid order.").optional().or(z.literal("").transform(() => undefined)),
-})
 
 const expenseSelect = {
     id: true,
@@ -109,15 +97,8 @@ export async function createExpense(req, res){
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = expenseSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
 
-        const { amount, description, orderId } = parsed.data
+        const { amount, description, orderId } = req.body
         if (!req.file && !orderId) {
             return res.status(400).json({ message: "Add a receipt photo or link the marketplace order" })
         }

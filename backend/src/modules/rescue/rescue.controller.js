@@ -3,15 +3,10 @@ import { prisma } from "../../db.js"
 import { uploadToR2 } from "../../services/upload.services.js";
 import { creditWallet } from "../../services/wallet.services.js";
 import { NOT_REFUNDED } from "../donation/donation.controller.js";
+import { PROGRESS_FROM } from "../../schemas/rescue.schemas.js";
 import { logAdminAction } from "../../services/audit.services.js";
 
 
-const postSchema = z.object({
-    title: z.string().trim().min(3, "Title must be at least 3 characters long.").max(150, "Title is too long."),
-    description: z.string().trim().min(10, "Description must be at least 10 characters long."),
-    rescueAreaId: z.uuid("Please select a rescue area."),
-    donationTarget: z.coerce.number("Donation target must be a number.").int("Donation target must be a whole number.").min(0, "Donation target cannot be negative.").max(10000000, "Donation target is too large.").optional(),
-});
 
 const postInclude = {
     creator: {
@@ -48,11 +43,7 @@ function withUpvoted({ upvotes, ...post }) {
 
 export async function addArea(req, res){
     try {
-        const name = typeof req.body?.area === "string" ? req.body.area.trim() : ""
-
-        if (!name) {
-            return res.status(400).json({ message: "Area name is required" })
-        }
+        const name = req.body.area
 
         const areaCreated = await prisma.$transaction(async (tx) => {
             const area = await tx.rescueArea.create({ data: { name } })
@@ -95,16 +86,8 @@ export async function listAreas(req, res){
 
 export async function createPost(req, res){
     try {
-        const parsed = postSchema.safeParse(req.body ?? {})
 
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
-
-        const { title, description, rescueAreaId, donationTarget } = parsed.data
+        const { title, description, rescueAreaId, donationTarget } = req.body
 
         const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } })
         if (!area) {
@@ -402,15 +385,7 @@ export async function assignPost(req, res){
 
 
 // Which statuses the assigned volunteer can move a rescue to, and from where
-const PROGRESS_FROM = {
-    IN_PROGRESS: ["ASSIGNED"],
-    RESOLVED: ["ASSIGNED", "IN_PROGRESS"],
-};
 
-const progressSchema = z.object({
-    status: z.enum(Object.keys(PROGRESS_FROM), "Status must be IN_PROGRESS or RESOLVED."),
-    note: z.string().trim().max(1000, "Update is too long.").optional(),
-});
 
 // The assigned volunteer moves their rescue forward: Assigned -> In Progress -> Rescued.
 // Marking it rescued can carry a closing note and photo.
@@ -421,15 +396,8 @@ export async function updatePostProgress(req, res){
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = progressSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
 
-        const { status, note } = parsed.data
+        const { status, note } = req.body
         const resolving = status === "RESOLVED"
 
         if (!resolving && (note || req.file)) {
@@ -497,9 +465,6 @@ export async function updatePostProgress(req, res){
 // the volunteer can keep posting after the rescue too, e.g. how the animal is recovering
 const UPDATABLE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "RESOLVED"]
 
-const rescueUpdateSchema = z.object({
-    note: z.string().trim().max(1000, "Update is too long.").default(""),
-})
 
 const rescueUpdateSelect = {
     id: true,
@@ -551,15 +516,8 @@ export async function createRescueUpdate(req, res){
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = rescueUpdateSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
 
-        const { note } = parsed.data
+        const { note } = req.body
         const files = req.files ?? []
         if (!note && files.length === 0) {
             return res.status(400).json({ message: "Write an update or add a photo" })
@@ -623,15 +581,8 @@ export async function updatePost(req, res){
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = postSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
 
-        const { title, description, rescueAreaId, donationTarget = 0 } = parsed.data
+        const { title, description, rescueAreaId, donationTarget = 0 } = req.body
 
         const area = await prisma.rescueArea.findUnique({ where: { id: rescueAreaId } })
         if (!area) {

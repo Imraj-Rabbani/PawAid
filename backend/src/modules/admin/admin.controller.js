@@ -6,6 +6,7 @@ import { creditFund, PAWAID_FUND_ID } from "../../services/fund.services.js";
 import { orderNumber } from "../order/order.controller.js";
 import { NOT_REFUNDED, refundHeldDonations } from "../donation/donation.controller.js";
 import { changedFields, logAdminAction, statusText } from "../../services/audit.services.js";
+import { POST_STATUSES, REPORT_STATUSES } from "../../schemas/admin.schemas.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -27,13 +28,6 @@ function enumFilter(values, value) {
 
 function searchTerm(query) {
     return typeof query.search === "string" ? query.search.trim() : ""
-}
-
-function validationError(res, parsed) {
-    return res.status(400).json({
-        message: "Validation failed",
-        errors: parsed.error.flatten().fieldErrors,
-    })
 }
 
 
@@ -127,10 +121,6 @@ export async function getStats(req, res) {
 const USER_ROLES = ["USER", "VOLUNTEER", "ADMIN"]
 const USER_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"]
 
-const userStatusSchema = z.object({
-    status: z.enum(["ACTIVE", "SUSPENDED"], "Status must be ACTIVE or SUSPENDED."),
-})
-
 const adminUserSelect = {
     id: true,
     name: true,
@@ -192,8 +182,6 @@ export async function updateUserStatus(req, res) {
             return res.status(404).json({ message: "User not found" })
         }
 
-        const parsed = userStatusSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
         if (userId.data === req.user.id) {
             return res.status(400).json({ message: "You cannot change your own status" })
@@ -211,12 +199,12 @@ export async function updateUserStatus(req, res) {
             return res.status(403).json({ message: "Admins cannot be suspended" })
         }
 
-        const suspending = parsed.data.status === "SUSPENDED"
+        const suspending = req.body.status === "SUSPENDED"
 
         const updated = await prisma.$transaction(async (tx) => {
             const updated = await tx.user.update({
                 where: { id: user.id },
-                data: { status: parsed.data.status },
+                data: { status: req.body.status },
                 select: adminUserSelect,
             })
             await logAdminAction(tx, req.user.id, {
@@ -224,7 +212,7 @@ export async function updateUserStatus(req, res) {
                 targetType: "USER",
                 targetId: user.id,
                 summary: `${suspending ? "Suspended" : "Reactivated"} ${user.name} (${user.email})`,
-                details: { from: user.status, to: parsed.data.status },
+                details: { from: user.status, to: req.body.status },
             })
             return updated
         })
@@ -245,10 +233,6 @@ export async function updateUserStatus(req, res) {
 // ========================================
 
 const VOLUNTEER_STATUSES = ["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED"]
-
-const volunteerStatusSchema = z.object({
-    status: z.enum(["ACTIVE", "SUSPENDED"], "Status must be ACTIVE or SUSPENDED."),
-})
 
 // Admins see the NID and wallet (read only) that the public listing hides
 const adminVolunteerSelect = {
@@ -321,10 +305,8 @@ export async function updateVolunteerStatus(req, res) {
             return res.status(404).json({ message: "Volunteer not found" })
         }
 
-        const parsed = volunteerStatusSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
-        const revoking = parsed.data.status === "SUSPENDED"
+        const revoking = req.body.status === "SUSPENDED"
 
         const volunteer = await prisma.$transaction(async (tx) => {
             const current = await tx.volunteerProfile.findUnique({
@@ -335,7 +317,7 @@ export async function updateVolunteerStatus(req, res) {
 
             const volunteer = await tx.volunteerProfile.update({
                 where: { id: current.id },
-                data: { status: parsed.data.status },
+                data: { status: req.body.status },
                 select: adminVolunteerSelect,
             })
             await logAdminAction(tx, req.user.id, {
@@ -343,7 +325,7 @@ export async function updateVolunteerStatus(req, res) {
                 targetType: "VOLUNTEER",
                 targetId: current.id,
                 summary: `${revoking ? "Revoked" : "Restored"} volunteer status for ${current.user.name}`,
-                details: { from: current.status, to: parsed.data.status },
+                details: { from: current.status, to: req.body.status },
             })
             return volunteer
         })
@@ -367,13 +349,8 @@ export async function updateVolunteerStatus(req, res) {
 // POSTS
 // ========================================
 
-const POST_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED", "CANCELLED"]
 // these statuses only make sense with a volunteer on the rescue
 const NEEDS_VOLUNTEER = ["ASSIGNED", "IN_PROGRESS"]
-
-const postStatusSchema = z.object({
-    status: z.enum(POST_STATUSES, "Invalid post status."),
-})
 
 const adminPostSelect = {
     id: true,
@@ -450,10 +427,8 @@ export async function updatePostStatus(req, res) {
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = postStatusSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
-        const { status } = parsed.data
+        const { status } = req.body
 
         const post = await prisma.rescuePost.findUnique({
             where: { id: postId.data },
@@ -530,12 +505,6 @@ export async function updatePostStatus(req, res) {
 // REPORTS
 // ========================================
 
-const REPORT_STATUSES = ["PENDING", "REVIEWED", "RESOLVED", "REJECTED"]
-
-const reportStatusSchema = z.object({
-    status: z.enum(REPORT_STATUSES, "Invalid report status."),
-})
-
 const adminReportSelect = {
     id: true,
     reason: true,
@@ -592,8 +561,6 @@ export async function updateReportStatus(req, res) {
             return res.status(404).json({ message: "Report not found" })
         }
 
-        const parsed = reportStatusSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
         const report = await prisma.$transaction(async (tx) => {
             const current = await tx.postReport.findUnique({
@@ -604,15 +571,15 @@ export async function updateReportStatus(req, res) {
 
             const report = await tx.postReport.update({
                 where: { id: current.id },
-                data: { status: parsed.data.status },
+                data: { status: req.body.status },
                 select: adminReportSelect,
             })
             await logAdminAction(tx, req.user.id, {
                 action: "REPORT_STATUS_CHANGED",
                 targetType: "POST_REPORT",
                 targetId: current.id,
-                summary: `Marked a "${current.reason}" report on "${current.post.title}" as ${statusText(parsed.data.status)}`,
-                details: { from: current.status, to: parsed.data.status },
+                summary: `Marked a "${current.reason}" report on "${current.post.title}" as ${statusText(req.body.status)}`,
+                details: { from: current.status, to: req.body.status },
             })
             return report
         })
@@ -632,10 +599,6 @@ export async function updateReportStatus(req, res) {
 // ========================================
 // RESCUE AREAS
 // ========================================
-
-const areaSchema = z.object({
-    name: z.string("Area name is required.").trim().min(2, "Area name is too short.").max(100, "Area name is too long."),
-})
 
 const adminAreaSelect = {
     id: true,
@@ -664,8 +627,6 @@ export async function renameArea(req, res) {
             return res.status(404).json({ message: "Area not found" })
         }
 
-        const parsed = areaSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
         const area = await prisma.$transaction(async (tx) => {
             const current = await tx.rescueArea.findUnique({ where: { id: areaId.data }, select: { id: true, name: true } })
@@ -673,7 +634,7 @@ export async function renameArea(req, res) {
 
             const area = await tx.rescueArea.update({
                 where: { id: current.id },
-                data: { name: parsed.data.name },
+                data: { name: req.body.name },
                 select: adminAreaSelect,
             })
             await logAdminAction(tx, req.user.id, {
@@ -747,10 +708,6 @@ export async function deleteArea(req, res) {
 // MARKETPLACE CATEGORIES
 // ========================================
 
-const categorySchema = z.object({
-    name: z.string("Category name is required.").trim().min(2, "Category name is too short.").max(60, "Category name is too long."),
-})
-
 const adminCategorySelect = {
     id: true,
     name: true,
@@ -773,12 +730,10 @@ export async function listCategories(req, res) {
 
 export async function createCategory(req, res) {
     try {
-        const parsed = categorySchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
         const category = await prisma.$transaction(async (tx) => {
             const category = await tx.productCategory.create({
-                data: { name: parsed.data.name },
+                data: { name: req.body.name },
                 select: adminCategorySelect,
             })
             await logAdminAction(tx, req.user.id, {
@@ -805,34 +760,6 @@ export async function createCategory(req, res) {
 // ========================================
 // MARKETPLACE PRODUCTS (PRD §14, §16, §28)
 // ========================================
-
-// products arrive as multipart form data, so numbers and booleans come in as strings
-// (a blank field is treated as missing rather than coerced to 0)
-const taka = (label, min, minMessage) => z.preprocess(
-    (value) => (value === "" ? undefined : value),
-    z.coerce.number(`${label} must be a number.`).int(`${label} must be a whole number.`).min(min, minMessage),
-)
-const boolField = z.union([z.boolean(), z.stringbool()], "Active must be true or false.")
-
-const productFields = {
-    name: z.string("Product name is required.").trim().min(2, "Product name is too short.").max(120, "Product name is too long."),
-    // "" clears the description
-    description: z.string().trim().max(2000, "Description is too long.").transform((d) => d || null),
-    categoryId: z.uuid("Choose a category."),
-    costPrice: taka("Cost price", 0, "Cost price can't be negative."),
-    sellingPrice: taka("Selling price", 1, "Selling price must be at least ৳1."),
-    stockQty: taka("Stock", 0, "Stock can't be negative."),
-    active: boolField,
-}
-
-const createProductSchema = z.object({
-    ...productFields,
-    description: productFields.description.optional(),
-    stockQty: productFields.stockQty.default(0),
-    active: boolField.default(true),
-})
-
-const updateProductSchema = z.object(productFields).partial()
 
 const PRODUCT_STATUSES = { active: true, inactive: false }
 
@@ -906,10 +833,8 @@ export async function listAdminProducts(req, res) {
 
 export async function createProduct(req, res) {
     try {
-        const parsed = createProductSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
-        const data = parsed.data
+        const data = req.body
 
         const badPrice = priceError(data.costPrice, data.sellingPrice)
         if (badPrice) {
@@ -954,10 +879,8 @@ export async function updateProduct(req, res) {
             return res.status(404).json({ message: "Product not found" })
         }
 
-        const parsed = updateProductSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
-        const data = parsed.data
+        const data = req.body
 
         const product = await prisma.product.findUnique({
             where: { id: productId.data },
@@ -1026,10 +949,6 @@ const ORDER_FLOW = {
     PROCESSING: ["SHIPPED", "CANCELLED"],
     SHIPPED: ["DELIVERED", "CANCELLED"],
 }
-
-const orderStatusSchema = z.object({
-    status: z.enum(["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"], "Invalid order status."),
-})
 
 const adminOrderSelect = {
     id: true,
@@ -1122,10 +1041,8 @@ export async function updateOrderStatus(req, res) {
             return res.status(404).json({ message: "Order not found" })
         }
 
-        const parsed = orderStatusSchema.safeParse(req.body ?? {})
-        if (!parsed.success) return validationError(res, parsed)
 
-        const { status } = parsed.data
+        const { status } = req.body
 
         const order = await prisma.order.findUnique({
             where: { id: orderId.data },

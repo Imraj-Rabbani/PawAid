@@ -21,7 +21,8 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
       setEditing(false);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Failed to update profile");
+      const fieldErrors = Object.values(err.response?.data?.errors || {}).flat();
+      alert(fieldErrors[0] || err.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }

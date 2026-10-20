@@ -84,7 +84,9 @@ PawAid/
 │       │   ├── admin.middleware.js        # requireAdmin
 │       │   ├── volunteer.middleware.js    # requireActiveVolunteer
 │       │   ├── idempotency.middleware.js  # requireIdempotencyKey, cleanupIdempotencyKeys
-│       │   └── upload.middleware.js       # multer + magic-byte check: JPEG/PNG/GIF/WebP, 5 MB
+│       │   ├── upload.middleware.js       # multer + magic-byte check: JPEG/PNG/GIF/WebP, 5 MB
+│       │   └── validate.middleware.js     # validateBody(schema): Zod check of req.body
+│       ├── schemas/             # Zod request-body schemas, one file per module (+ common.schemas.js)
 │       ├── services/
 │       │   ├── audit.services.js    # logAdminAction, changedFields
 │       │   ├── wallet.services.js   # creditWallet, debitWallet
@@ -129,7 +131,7 @@ PawAid/
             └── transparency/  # PawAid Fund donate modal (admins)
 ```
 
-Each backend module is a single `*.controller.js` (auth also has `services` and `utils`). Controllers validate with Zod, talk to Prisma directly, and call the shared services for anything that moves money. There is no separate repository or service layer per module.
+Each backend module is a single `*.controller.js` (auth also has `services` and `utils`). Request bodies are validated with Zod before the controller runs (`validateBody` on the route, schemas in `src/schemas/`); controllers talk to Prisma directly and call the shared services for anything that moves money. There is no separate repository or service layer per module.
 
 ---
 
@@ -145,11 +147,12 @@ request
       → requireAdmin | requireActiveVolunteer   may they do this
       → requireIdempotencyKey               money-moving routes only
       → upload.single / upload.array        multipart routes only
-      → controller                          Zod validation → Prisma → JSON
+      → validateBody(schema)                routes that take a body: 400 or a parsed req.body
+      → controller                          Prisma → JSON
   → error handler                           multer errors → 400, others → status or 500
 ```
 
-Controllers mostly handle their own errors and return `{ message, data }` (or `{ message, errors }` for validation failures, using Zod's `flatten().fieldErrors`). The global error handler in `server.js` catches anything thrown past them and never leaks a 500's details.
+`validateBody` answers a bad body with `400 { message: "Validation failed", errors }` (Zod's `flatten().fieldErrors`); otherwise it replaces `req.body` with the parsed data, so controllers only ever see trimmed, coerced values and the fields the schema lists. It runs after `requireIdempotencyKey`, so a rejected body releases the key. URL parameters (`:postId` and so on) are still checked in the controller, which answers a malformed id with a 404. Controllers mostly handle their own errors and return `{ message, data }`. The global error handler in `server.js` catches anything thrown past them and never leaks a 500's details.
 
 ### 4.2 Authentication and authorization
 
@@ -367,4 +370,3 @@ npm run dev                  # API on :3000 and Vite on :5173, side by side
 - **No automated tests.** `backend/tests/` is empty and there is no reconciliation check that wallet balances equal the sum of their wallet transactions.
 - **`JWT_SECRET` has an insecure fallback**, and there is **no rate limiting** on sign in or money-moving routes.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.
-- **Validation is per controller.** A few older endpoints (volunteer apply/update, profile update) validate by hand instead of with Zod.

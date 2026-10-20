@@ -8,6 +8,21 @@ import { upload } from "../middleware/upload.middleware.js";
 import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
+import { validateBody } from "../middleware/validate.middleware.js";
+import { loginSchema, registerSchema } from "../schemas/auth.schemas.js";
+import { profileSchema } from "../schemas/user.schemas.js";
+import { applicationSchema, volunteerUpdateSchema } from "../schemas/volunteer.schemas.js";
+import { addAreaSchema, postSchema, progressSchema, rescueUpdateSchema } from "../schemas/rescue.schemas.js";
+import { commentSchema } from "../schemas/comment.schemas.js";
+import { reportSchema } from "../schemas/report.schemas.js";
+import { expenseSchema } from "../schemas/expense.schemas.js";
+import { checkoutSchema } from "../schemas/order.schemas.js";
+import { topUpSchema, transferSchema } from "../schemas/wallet.schemas.js";
+import { donationSchema, fundDonationSchema } from "../schemas/donation.schemas.js";
+import {
+    areaSchema, categorySchema, createProductSchema, orderStatusSchema, postStatusSchema, reportStatusSchema,
+    updateProductSchema, userStatusSchema, volunteerStatusSchema,
+} from "../schemas/admin.schemas.js";
 import {
     createCategory, createProduct, deleteArea, getStats, listAdminAreas, listAdminPosts, listAdminProducts, listAuditLogs,
     listCategories, listOrders, listReports, listTransactions, listUsers, listVolunteers, renameArea, updateOrderStatus,
@@ -25,12 +40,12 @@ import { createExpense, deleteExpense, listExpenses } from "../modules/expense/e
 
 const router = Router()
 
-router.post("/signup", register)
-router.post("/signin", login)
+router.post("/signup", validateBody(registerSchema), register)
+router.post("/signin", validateBody(loginSchema), login)
 
 
 router.get("/profile/:userId", requireAuth, getUserProfile)
-router.put("/profile/update", requireAuth, updateProfile)
+router.put("/profile/update", requireAuth, validateBody(profileSchema), updateProfile)
 router.put("/users/profile-picture", requireAuth, upload.single("profilePicture"), updateProfilePicture)
 
 
@@ -42,33 +57,33 @@ router.get("/marketplace/products", listProducts)
 router.get("/marketplace/products/:productId", getProduct)
 router.get("/marketplace/categories", listMarketplaceCategories)
 router.get("/orders", requireAuth, listMyOrders)
-router.post("/orders", requireAuth, requireIdempotencyKey, createOrder)
+router.post("/orders", requireAuth, requireIdempotencyKey, validateBody(checkoutSchema), createOrder)
 router.get("/orders/:orderId", requireAuth, getOrder)
 
 
 router.get("/area", listAreas)
-router.post("/add-area", requireAuth, requireAdmin, addArea)
+router.post("/add-area", requireAuth, requireAdmin, validateBody(addAreaSchema), addArea)
 
 
 router.get("/rescue-post", optionalAuth, listPosts)
 // keep before the /rescue-post/:postId routes so "mine" is not treated as an id
 router.get("/rescue-post/mine", requireAuth, listMyPosts)
-router.post("/rescue-post", requireAuth, upload.array("images", 5), createPost)
+router.post("/rescue-post", requireAuth, upload.array("images", 5), validateBody(postSchema), createPost)
 router.get("/rescue-post/:postId", optionalAuth, getPost)
 router.get("/rescue-post/:postId/comments", listComments)
-router.post("/rescue-post/:postId/comments", requireAuth, createComment)
+router.post("/rescue-post/:postId/comments", requireAuth, validateBody(commentSchema), createComment)
 router.delete("/comments/:commentId", requireAuth, deleteComment)
 router.post("/rescue-post/:postId/upvote", requireAuth, upvotePost)
 router.delete("/rescue-post/:postId/upvote", requireAuth, removeUpvote)
-router.post("/rescue-post/:postId/report", requireAuth, reportPost)
+router.post("/rescue-post/:postId/report", requireAuth, validateBody(reportSchema), reportPost)
 router.post("/rescue-post/:postId/assign", requireAuth, requireActiveVolunteer, assignPost)
 router.get("/rescue-post/:postId/updates", listRescueUpdates)
-router.post("/rescue-post/:postId/updates", requireAuth, requireActiveVolunteer, upload.array("images", 4), createRescueUpdate)
+router.post("/rescue-post/:postId/updates", requireAuth, requireActiveVolunteer, upload.array("images", 4), validateBody(rescueUpdateSchema), createRescueUpdate)
 router.get("/rescue-post/:postId/expenses", listExpenses)
-router.post("/rescue-post/:postId/expenses", requireAuth, requireActiveVolunteer, upload.single("receipt"), createExpense)
+router.post("/rescue-post/:postId/expenses", requireAuth, requireActiveVolunteer, upload.single("receipt"), validateBody(expenseSchema), createExpense)
 router.delete("/expenses/:expenseId", requireAuth, requireActiveVolunteer, deleteExpense)
-router.patch("/rescue-post/:postId/progress", requireAuth, requireActiveVolunteer, upload.single("photo"), updatePostProgress)
-router.put("/rescue-post/:postId", requireAuth, updatePost)
+router.patch("/rescue-post/:postId/progress", requireAuth, requireActiveVolunteer, upload.single("photo"), validateBody(progressSchema), updatePostProgress)
+router.put("/rescue-post/:postId", requireAuth, validateBody(postSchema), updatePost)
 router.delete("/rescue-post/:postId", requireAuth, deletePost)
 
 
@@ -76,45 +91,45 @@ router.delete("/rescue-post/:postId", requireAuth, deletePost)
 router.use("/admin", requireAuth, requireAdmin)
 router.get("/admin/stats", getStats)
 router.get("/admin/users", listUsers)
-router.patch("/admin/users/:userId/status", updateUserStatus)
+router.patch("/admin/users/:userId/status", validateBody(userStatusSchema), updateUserStatus)
 router.get("/admin/volunteers", listVolunteers)
-router.patch("/admin/volunteers/:volunteerId/status", updateVolunteerStatus)
+router.patch("/admin/volunteers/:volunteerId/status", validateBody(volunteerStatusSchema), updateVolunteerStatus)
 router.get("/admin/posts", listAdminPosts)
-router.patch("/admin/posts/:postId/status", updatePostStatus)
+router.patch("/admin/posts/:postId/status", validateBody(postStatusSchema), updatePostStatus)
 router.get("/admin/reports", listReports)
-router.patch("/admin/reports/:reportId", updateReportStatus)
+router.patch("/admin/reports/:reportId", validateBody(reportStatusSchema), updateReportStatus)
 router.get("/admin/areas", listAdminAreas)
-router.patch("/admin/areas/:areaId", renameArea)
+router.patch("/admin/areas/:areaId", validateBody(areaSchema), renameArea)
 router.delete("/admin/areas/:areaId", deleteArea)
 router.get("/admin/transactions", listTransactions)
 router.get("/admin/categories", listCategories)
-router.post("/admin/categories", createCategory)
+router.post("/admin/categories", validateBody(categorySchema), createCategory)
 router.get("/admin/products", listAdminProducts)
-router.post("/admin/products", upload.single("image"), createProduct)
-router.patch("/admin/products/:productId", upload.single("image"), updateProduct)
+router.post("/admin/products", upload.single("image"), validateBody(createProductSchema), createProduct)
+router.patch("/admin/products/:productId", upload.single("image"), validateBody(updateProductSchema), updateProduct)
 router.get("/admin/orders", listOrders)
-router.patch("/admin/orders/:orderId/status", updateOrderStatus)
-router.post("/admin/fund/donations", requireIdempotencyKey, donateFromFund)
+router.patch("/admin/orders/:orderId/status", validateBody(orderStatusSchema), updateOrderStatus)
+router.post("/admin/fund/donations", requireIdempotencyKey, validateBody(fundDonationSchema), donateFromFund)
 router.get("/admin/audit-logs", listAuditLogs)
 
 
 router.get("/volunteer", volunteers)
-router.post("/volunteer/apply", requireAuth, volunteerApplication)
+router.post("/volunteer/apply", requireAuth, validateBody(applicationSchema), volunteerApplication)
 router.get("/volunteer/profile", requireAuth, volunteer)
-router.put("/volunteer/profile", requireAuth, requireActiveVolunteer, updateVolunteerProfile)
+router.put("/volunteer/profile", requireAuth, requireActiveVolunteer, validateBody(volunteerUpdateSchema), updateVolunteerProfile)
 // keep after /volunteer/profile so "profile" is not treated as an id
 router.get("/volunteer/:id", volunteerById)
 
 
 router.get("/wallet/me", requireAuth, myWallet)
-router.post("/wallet/top-up", requireAuth, requireIdempotencyKey, topUpWallet)
+router.post("/wallet/top-up", requireAuth, requireIdempotencyKey, validateBody(topUpSchema), topUpWallet)
 router.get("/wallet/transactions", requireAuth, myWalletTransactions)
-router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, requireIdempotencyKey, transferToVolunteer)
+router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, requireIdempotencyKey, validateBody(transferSchema), transferToVolunteer)
 
 
 router.get("/donations", listDonations)
 router.get("/donations/me", requireAuth, myDonations)
-router.post("/donations/volunteer/:volunteerId", requireAuth, requireIdempotencyKey, donateToVolunteer)
-router.post("/donations/rescue-post/:postId", requireAuth, requireIdempotencyKey, donateToPost)
+router.post("/donations/volunteer/:volunteerId", requireAuth, requireIdempotencyKey, validateBody(donationSchema), donateToVolunteer)
+router.post("/donations/rescue-post/:postId", requireAuth, requireIdempotencyKey, validateBody(donationSchema), donateToPost)
 
 export default router

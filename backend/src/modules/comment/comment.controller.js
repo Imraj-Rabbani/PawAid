@@ -1,9 +1,6 @@
 import z from "zod";
 import { prisma } from "../../db.js";
 
-const commentSchema = z.object({
-    text: z.string().trim().min(1, "Comment cannot be empty.").max(1000, "Comment is too long."),
-});
 
 const commentInclude = {
     author: {
@@ -57,13 +54,6 @@ export async function createComment(req, res){
             return res.status(404).json({ message: "Post not found" })
         }
 
-        const parsed = commentSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            });
-        }
 
         const post = await prisma.rescuePost.findUnique({
             where: { id: postId.data },
@@ -77,7 +67,7 @@ export async function createComment(req, res){
             data: {
                 postId: post.id,
                 authorId: req.user.id,
-                text: parsed.data.text,
+                text: req.body.text,
             },
             include: commentInclude,
         })

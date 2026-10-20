@@ -70,10 +70,8 @@ export default function VolunteerForm({
       onSuccess?.(res.data);
     } catch (err) {
       console.error(err);
-      alert(
-        err.response?.data?.message ||
-          "Something went wrong"
-      );
+      const fieldErrors = Object.values(err.response?.data?.errors || {}).flat();
+      alert(fieldErrors[0] || err.response?.data?.message || "Something went wrong");
     } finally {
       setSaving(false);
     }
@@ -105,6 +103,7 @@ export default function VolunteerForm({
           required
           value={form.nid}
           onChange={(e) => setForm({ ...form, nid: e.target.value })}
+          inputMode="numeric"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="National ID number"
         />
@@ -144,6 +143,7 @@ export default function VolunteerForm({
         </label>
         <textarea
           rows={4}
+          maxLength={1000}
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

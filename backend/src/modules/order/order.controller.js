@@ -6,25 +6,6 @@ import { debitWallet, InsufficientFundsError } from "../../services/wallet.servi
 // CHECKOUT (PRD §15, §22, §35, §40)
 // ========================================
 
-const checkoutSchema = z.object({
-    items: z
-        .array(z.object({
-            productId: z.uuid("Invalid product."),
-            quantity: z.number("Quantity must be a number.").int("Quantity must be a whole number.").min(1).max(99),
-        }), "Your cart is empty.")
-        .min(1, "Your cart is empty.")
-        .max(48, "Too many different products in one order."),
-    // online payments (bKash, Nagad, card) are switched off for now
-    paymentMethod: z.enum(["CASH", "WALLET"], "Choose a payment method."),
-    delivery: z.object({
-        name: z.string("Recipient name is required.").trim().min(3, "Recipient name is too short.").max(100, "Recipient name is too long."),
-        phone: z.string("Phone number is required.").trim().regex(/^\+?[0-9][0-9 -]{5,18}[0-9]$/, "Enter a valid phone number."),
-        address: z.string("Delivery address is required.").trim().min(10, "Enter the full delivery address.").max(500, "Address must be 500 characters or fewer."),
-    }, "Delivery details are required."),
-    saveAddress: z.boolean().optional(),
-    // the total the buyer saw; if prices moved since, they confirm again instead of being charged a surprise
-    expectedTotal: z.number().int().optional(),
-})
 
 export const orderSelect = {
     id: true,
@@ -59,21 +40,14 @@ export const orderNumber = (id) => id.slice(0, 8).toUpperCase()
 
 export async function createOrder(req, res) {
     try {
-        const parsed = checkoutSchema.safeParse(req.body ?? {})
-        if (!parsed.success) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: parsed.error.flatten().fieldErrors,
-            })
-        }
 
-        const { paymentMethod, delivery, saveAddress, expectedTotal } = parsed.data
+        const { paymentMethod, delivery, saveAddress, expectedTotal } = req.body
         const buyerId = req.user.id
 
         // merge repeated lines, and always lock products in the same order so two
         // checkouts sharing products can't deadlock each other
         const quantities = new Map()
-        for (const { productId, quantity } of parsed.data.items) {
+        for (const { productId, quantity } of req.body.items) {
             quantities.set(productId, (quantities.get(productId) ?? 0) + quantity)
         }
         const productIds = [...quantities.keys()].sort()
