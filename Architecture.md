@@ -367,6 +367,6 @@ npm run dev                  # API on :3000 and Vite on :5173, side by side
 
 ## 9. Known Gaps
 
-- **No automated tests.** `backend/tests/` is empty and there is no reconciliation check that wallet balances equal the sum of their wallet transactions.
+
 - **`JWT_SECRET` has an insecure fallback**, and there is **no rate limiting** on sign in or money-moving routes.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.

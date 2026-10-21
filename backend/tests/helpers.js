@@ -74,6 +74,24 @@ export async function createPost({ creator, donationTarget = 10000 }) {
   })
 }
 
+export async function createProduct({ sellingPrice = 100, costPrice = 60, stockQty = 10 } = {}) {
+  const category = await prisma.productCategory.create({ data: { name: `Category ${newKey()}` } })
+  return prisma.product.create({
+    data: { categoryId: category.id, name: "Dog food", sellingPrice, costPrice, stockQty },
+  })
+}
+
+const DELIVERY = { name: "Test Buyer", phone: "01700000000", address: "House 1, Road 2, Dhaka" }
+
+export function checkout(user, { items, paymentMethod = "WALLET", ...rest }) {
+  return post("/orders", { token: user.token, body: { items, paymentMethod, delivery: DELIVERY, ...rest } })
+}
+
+// An authenticated PATCH, for the admin status routes
+export function patch(path, { token, body }) {
+  return request(app).patch(`/api${path}`).set("Authorization", `Bearer ${token}`).send(body)
+}
+
 export async function topUp(user, amount) {
   const res = await post("/wallet/top-up", { token: user.token, body: { amount } })
   expect(res.status).toBe(200)
