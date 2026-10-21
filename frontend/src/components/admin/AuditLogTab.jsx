@@ -85,7 +85,7 @@ function AuditRow({ log }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Badge status={AUDIT_ACTION[log.action]} fallback={titleCase(log.action)} />
-          <p className="text-sm font-semibold text-on-surface break-words">{log.summary}</p>
+          <p className="text-sm font-semibold text-on-surface wrap-break-words">{log.summary}</p>
         </div>
         {changes.length > 0 && (
           <p className="mt-0.5 text-xs text-on-surface-variant flex flex-wrap gap-x-3">
