@@ -2,7 +2,7 @@ import env from "../../config/env.js";
 import jwt from "jsonwebtoken";
 
 export function sanitizeUser(user) {
-    const { password, ...safeUser } = user
+    const { password, googleId, ...safeUser } = user
     return safeUser
 }
 

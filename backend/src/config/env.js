@@ -6,6 +6,7 @@ const env = {
     JWT_EXPIRY: process.env.JWT_EXPIRY ?? "7d",
     PORT: process.env.PORT ?? 3000,
     CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,

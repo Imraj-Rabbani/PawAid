@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/api';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -70,6 +71,24 @@ const SignIn = () => {
         error.message ||
         'Invalid credentials. Please try again.';
       setServerError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    setServerError('');
+    setLoading(true);
+    try {
+      const response = await authService.signInWithGoogle(credential);
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      navigate(afterSignIn, { replace: true });
+    } catch (error) {
+      setServerError(
+        error.response?.data?.message ||
+        'Google sign-in failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -196,6 +215,8 @@ const SignIn = () => {
               )}
             </button>
           </form>
+
+          <GoogleSignInButton onCredential={handleGoogleCredential} onError={setServerError} />
 
           {/* Footer */}
           <p className="mt-6 text-center text-sm text-gray-600">

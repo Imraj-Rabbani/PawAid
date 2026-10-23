@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
       JWT_SECRET: "test-secret",
+      GOOGLE_CLIENT_ID: "test-client-id",
     },
     // every file shares the one database, so they run one at a time
     fileParallelism: false,

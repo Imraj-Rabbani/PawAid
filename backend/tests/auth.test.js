@@ -13,6 +13,7 @@ import { createPost, createUser, createVolunteer, newKey, post, topUp } from "./
 const PUBLIC_ROUTES = new Set([
   "POST /signup",
   "POST /signin",
+  "POST /signin/google",
   "GET /home/summary",
   "GET /transparency",
   "GET /marketplace/products",

@@ -46,6 +46,10 @@ export const authService = {
     const response = await api.post('/signin', credentials);
     return response.data;
   },
+  signInWithGoogle: async (credential) => {
+    const response = await api.post('/signin/google', { credential });
+    return response.data;
+  },
 };
 
 export default api;

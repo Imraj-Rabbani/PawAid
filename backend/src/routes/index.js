@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, register } from "../modules/auth/auth.controller.js";
+import { googleLogin, login, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, assignPost, createPost, createRescueUpdate, deletePost, getPost, listAreas, listMyPosts, listPosts, listRescueUpdates, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
@@ -9,7 +9,7 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import { validateBody } from "../middleware/validate.middleware.js";
-import { loginSchema, registerSchema } from "../schemas/auth.schemas.js";
+import { googleLoginSchema, loginSchema, registerSchema } from "../schemas/auth.schemas.js";
 import { profileSchema } from "../schemas/user.schemas.js";
 import { applicationSchema, volunteerUpdateSchema } from "../schemas/volunteer.schemas.js";
 import { addAreaSchema, postSchema, progressSchema, rescueUpdateSchema } from "../schemas/rescue.schemas.js";
@@ -42,6 +42,7 @@ const router = Router()
 
 router.post("/signup", validateBody(registerSchema), register)
 router.post("/signin", validateBody(loginSchema), login)
+router.post("/signin/google", validateBody(googleLoginSchema), googleLogin)
 
 
 router.get("/profile/:userId", requireAuth, getUserProfile)

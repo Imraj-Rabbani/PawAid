@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -69,6 +70,24 @@ const SignUp = () => {
                 error.message ||
                 'Something went wrong. Please try again.';
             setServerError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleCredential = async (credential) => {
+        setServerError('');
+        setLoading(true);
+        try {
+            const response = await authService.signInWithGoogle(credential);
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('user', JSON.stringify(response.user));
+            navigate('/');
+        } catch (error) {
+            setServerError(
+                error.response?.data?.message ||
+                'Google sign-up failed. Please try again.'
+            );
         } finally {
             setLoading(false);
         }
@@ -220,6 +239,8 @@ const SignUp = () => {
                             )}
                         </button>
                     </form>
+
+                    <GoogleSignInButton text="signup_with" onCredential={handleGoogleCredential} onError={setServerError} />
 
                     {/* Footer */}
                     <p className="mt-6 text-center text-sm text-gray-600">
