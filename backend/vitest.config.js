@@ -13,7 +13,7 @@ export default defineConfig({
     // existing variable, so the tests can't reach the real database
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
-      JWT_SECRET: "test-secret",
+      JWT_SECRET: "test-secret-that-is-at-least-32-characters",
       GOOGLE_CLIENT_ID: "test-client-id",
     },
     // every file shares the one database, so they run one at a time

@@ -346,7 +346,7 @@ Tailwind CSS 4. Newer screens (homepage, marketplace, transparency, admin) use t
 | Variable | Purpose | Default |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | — (required) |
-| `JWT_SECRET` | JWT signing key | `secret_123` ⚠️ set this |
+| `JWT_SECRET` | JWT signing key, at least 32 random characters | none: the server refuses to start without it |
 | `JWT_EXPIRY` | Token lifetime | `7d` |
 | `PORT` | API port | `3000` |
 | `CORS_ORIGIN` | Allowed frontend origin | `http://localhost:5173` |
@@ -368,5 +368,4 @@ npm run dev                  # API on :3000 and Vite on :5173, side by side
 ## 9. Known Gaps
 
 
-- **`JWT_SECRET` has an insecure fallback**, and there is **no rate limiting** on sign in or money-moving routes.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.
