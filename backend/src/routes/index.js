@@ -9,6 +9,7 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import { validateBody } from "../middleware/validate.middleware.js";
+import { googleSigninLimit, moneyLimit, signinEmailLimit, signinIpLimit, signupLimit } from "../middleware/rateLimit.middleware.js";
 import { googleLoginSchema, loginSchema, registerSchema } from "../schemas/auth.schemas.js";
 import { profileSchema } from "../schemas/user.schemas.js";
 import { applicationSchema, volunteerUpdateSchema } from "../schemas/volunteer.schemas.js";
@@ -40,9 +41,9 @@ import { createExpense, deleteExpense, listExpenses } from "../modules/expense/e
 
 const router = Router()
 
-router.post("/signup", validateBody(registerSchema), register)
-router.post("/signin", validateBody(loginSchema), login)
-router.post("/signin/google", validateBody(googleLoginSchema), googleLogin)
+router.post("/signup", signupLimit, validateBody(registerSchema), register)
+router.post("/signin", signinIpLimit, validateBody(loginSchema), signinEmailLimit, login)
+router.post("/signin/google", googleSigninLimit, validateBody(googleLoginSchema), googleLogin)
 
 
 router.get("/profile/:userId", requireAuth, getUserProfile)
@@ -58,7 +59,7 @@ router.get("/marketplace/products", listProducts)
 router.get("/marketplace/products/:productId", getProduct)
 router.get("/marketplace/categories", listMarketplaceCategories)
 router.get("/orders", requireAuth, listMyOrders)
-router.post("/orders", requireAuth, requireIdempotencyKey, validateBody(checkoutSchema), createOrder)
+router.post("/orders", requireAuth, moneyLimit, requireIdempotencyKey, validateBody(checkoutSchema), createOrder)
 router.get("/orders/:orderId", requireAuth, getOrder)
 
 
@@ -123,14 +124,14 @@ router.get("/volunteer/:id", volunteerById)
 
 
 router.get("/wallet/me", requireAuth, myWallet)
-router.post("/wallet/top-up", requireAuth, requireIdempotencyKey, validateBody(topUpSchema), topUpWallet)
+router.post("/wallet/top-up", requireAuth, moneyLimit, requireIdempotencyKey, validateBody(topUpSchema), topUpWallet)
 router.get("/wallet/transactions", requireAuth, myWalletTransactions)
-router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, requireIdempotencyKey, validateBody(transferSchema), transferToVolunteer)
+router.post("/wallet/transfer", requireAuth, requireActiveVolunteer, moneyLimit, requireIdempotencyKey, validateBody(transferSchema), transferToVolunteer)
 
 
 router.get("/donations", listDonations)
 router.get("/donations/me", requireAuth, myDonations)
-router.post("/donations/volunteer/:volunteerId", requireAuth, requireIdempotencyKey, validateBody(donationSchema), donateToVolunteer)
-router.post("/donations/rescue-post/:postId", requireAuth, requireIdempotencyKey, validateBody(donationSchema), donateToPost)
+router.post("/donations/volunteer/:volunteerId", requireAuth, moneyLimit, requireIdempotencyKey, validateBody(donationSchema), donateToVolunteer)
+router.post("/donations/rescue-post/:postId", requireAuth, moneyLimit, requireIdempotencyKey, validateBody(donationSchema), donateToPost)
 
 export default router

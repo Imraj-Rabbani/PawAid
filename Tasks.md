@@ -240,7 +240,7 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 - [ ] **Public donations page shows donor names and amounts** (`GET /api/donations`, `/donations`). This conflicts with PRD §41. Decide: hide donor identities, or allow it and add an "anonymous" option
 - [ ] Reconciliation check and unit tests for the wallet/fund services (from Stage 4)
 - [ ] `JWT_SECRET` falls back to `"secret_123"` when unset; fail at startup instead
-- [ ] Rate limiting on auth and money-moving routes
+- [x] Rate limiting on auth and money-moving routes (`rateLimit.middleware.js`; in-memory, so per process. Set `TRUST_PROXY` when deployed behind a proxy)
 - [ ] Update `Architecture.md`: still describes Cloudinary, `ledger.service.js`, `rbac.middleware.js` and the planned folder layout
 
 **Key considerations:**

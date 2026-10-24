@@ -6,6 +6,7 @@ import routes from "./routes/index.js";
 // The Express app without app.listen, so tests can drive it with supertest.
 // server.js starts it.
 const app = express();
+app.set("trust proxy", env.TRUST_PROXY)
 app.use(cors({
   origin: env.CORS_ORIGIN
 }))

@@ -1,5 +1,6 @@
 import { afterAll, beforeEach } from "vitest"
 import { prisma } from "../../src/db.js"
+import { resetRateLimits } from "../../src/middleware/rateLimit.middleware.js"
 import { resetDatabase } from "../helpers.js"
 
 // the tests wipe every table, so never let them near a real database
@@ -9,5 +10,6 @@ if (url.hostname !== "localhost" || url.pathname !== "/pawaid_test") {
 }
 
 beforeEach(resetDatabase)
+beforeEach(resetRateLimits)
 
 afterAll(() => prisma.$disconnect())
