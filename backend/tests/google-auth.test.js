@@ -21,7 +21,7 @@ describe("signing in with Google", () => {
     const res = await googleSignIn()
 
     expect(res.status).toBe(200)
-    expect(res.body.token).toEqual(expect.any(String))
+    expect(res.headers["set-cookie"][0]).toMatch(/^token=.+; .*HttpOnly/)
     expect(res.body.user).toMatchObject({ name: "Dog Lover", email: "dog.lover@gmail.com" })
     expect(res.body.user).not.toHaveProperty("password")
     expect(res.body.user).not.toHaveProperty("googleId")
@@ -57,7 +57,7 @@ describe("signing in with Google", () => {
     const res = await googleSignIn()
 
     expect(res.status).toBe(401)
-    expect(res.body.token).toBeUndefined()
+    expect(res.headers["set-cookie"]).toBeUndefined()
   })
 
   it("refuses an unverified email", async () => {
@@ -76,7 +76,7 @@ describe("signing in with Google", () => {
     const res = await googleSignIn()
 
     expect(res.status).toBe(403)
-    expect(res.body.token).toBeUndefined()
+    expect(res.headers["set-cookie"]).toBeUndefined()
   })
 
   it("tells a Google-only user to use Google instead of a password", async () => {

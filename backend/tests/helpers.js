@@ -3,7 +3,7 @@ import request from "supertest"
 import { expect } from "vitest"
 import app from "../src/app.js"
 import { prisma } from "../src/db.js"
-import { generateToken } from "../src/modules/auth/auth.utils.js"
+import { startSession } from "../src/modules/auth/auth.services.js"
 import { creditFund, PAWAID_FUND_ID } from "../src/services/fund.services.js"
 import { findLedgerProblems } from "../src/services/ledger.services.js"
 
@@ -55,7 +55,8 @@ export async function createUser({ role = "USER", name } = {}) {
     },
     include: { wallet: true },
   })
-  return { ...user, token: generateToken({ userId: user.id, email: user.email }) }
+  const { token } = await startSession(user)
+  return { ...user, token }
 }
 
 export async function createVolunteer({ name } = {}) {

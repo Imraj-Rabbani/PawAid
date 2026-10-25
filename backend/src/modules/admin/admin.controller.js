@@ -7,6 +7,7 @@ import { orderNumber } from "../order/order.controller.js";
 import { NOT_REFUNDED, refundHeldDonations } from "../donation/donation.controller.js";
 import { changedFields, logAdminAction, statusText } from "../../services/audit.services.js";
 import { POST_STATUSES, REPORT_STATUSES } from "../../schemas/admin.schemas.js";
+import { endAllSessions } from "../auth/auth.services.js";
 
 const publicUserSelect = { id: true, name: true, profilePictureUrl: true };
 
@@ -207,6 +208,8 @@ export async function updateUserStatus(req, res) {
                 data: { status: req.body.status },
                 select: adminUserSelect,
             })
+            // signs them out everywhere; reactivating doesn't bring old sessions back
+            if (suspending) await endAllSessions(user.id, tx)
             await logAdminAction(tx, req.user.id, {
                 action: suspending ? "USER_SUSPENDED" : "USER_REACTIVATED",
                 targetType: "USER",

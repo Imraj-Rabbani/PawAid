@@ -11,10 +11,10 @@ PawAid is a **PERN** app (PostgreSQL, Express, React, Node.js): a React single-p
 ```text
 ┌──────────────────────────┐
 │   React SPA (Vite)       │  React Router, Tailwind, axios
-│   localhost:5173         │  token + user + cart in localStorage
+│   localhost:5173         │  user + cart in localStorage
 └────────────┬─────────────┘
              │ REST / JSON under /api
-             │ Authorization: Bearer <JWT>
+             │ JWT in an httpOnly cookie (+ X-Requested-With)
              │ Idempotency-Key on money-moving requests
 ┌────────────▼─────────────┐
 │  Express 5 API           │  localhost:3000
@@ -156,7 +156,8 @@ request
 
 ### 4.2 Authentication and authorization
 
-- **Sign up / sign in** return `{ user, token }`. Passwords are hashed with bcrypt (10 rounds). The JWT holds `userId` and `email` and expires after `JWT_EXPIRY` (default 7 days). There are no refresh tokens, and logout is client side.
+- **Sign up / sign in** return `{ user }` and set the JWT as an httpOnly `token` cookie, so page scripts (and XSS) can't read it. Passwords are hashed with bcrypt (10 rounds). The JWT holds `userId`, `email` and `sessionId`, and expires after `JWT_EXPIRY` (default 7 days). Each sign-in creates a `sessions` row, and `requireAuth` only accepts a token whose session still exists, so the server can revoke tokens: `POST /signout` deletes that session, `POST /signout/all` deletes all of the user's sessions, and suspending a user deletes theirs. There are no refresh tokens; `requireAuth` already reads the database on every request, so checking the session costs nothing extra. `requireAuth` also accepts `Authorization: Bearer` (scripts, tests).
+- **CSRF:** `requireCsrfHeader` refuses any non-GET request that carries the cookie but not `X-Requested-With: XMLHttpRequest`. Another site can't add that header without passing CORS. Cookie flags come from `COOKIE_SECURE` and `COOKIE_SAME_SITE` (`none` when the frontend and API are on different sites).
 - **`requireAuth`** verifies the token, loads the user, and rejects anyone whose status isn't `ACTIVE` with a **401**. The frontend clears its token on any 401, so a suspended user is signed out on their next request.
 - **`optionalAuth`** is for public routes that show extra details to a signed-in viewer (e.g. whether they upvoted a post). A bad token just means "guest".
 - **`requireAdmin`** checks `role === "ADMIN"`. It is applied to the whole `/api/admin` prefix with `router.use`.
@@ -328,7 +329,7 @@ Schema changes go through Prisma migrations in `backend/prisma/migrations`. Some
 ### 7.2 State and data fetching
 
 - **No global data store.** Pages fetch with the shared axios instance in `useEffect`, using an `ignore` flag to drop stale responses, and keep results in local state.
-- **Session:** `token` and `user` live in `localStorage`. The request interceptor adds `Authorization: Bearer`. The response interceptor clears both on a 401, which signs out suspended users. `updateStoredUser` keeps the cached user current after profile edits.
+- **Session:** the login cookie is httpOnly, so the frontend never sees the token. axios sends it with `withCredentials` and adds `X-Requested-With`. `user` lives in `localStorage` for display only; the response interceptor clears it on a 401, which signs out suspended users and expired sessions. `updateStoredUser` keeps the cached user current after profile edits.
 - **Cart:** `CartProvider` stores `{ ownerId, items }` in `localStorage`. A guest cart is adopted on sign in, and another user's cart is never shown. `useCartSync` re-checks prices and stock against `GET /marketplace/products?ids=` once per visit, and again when checkout returns `CART_CHANGED`.
 - **Payments:** components that send money use `useIdempotencyKey()` for a key that stays the same across retries, and call `renew()` after a success.
 - **Role checks in the UI are cosmetic** (hiding admin buttons, etc.). The API enforces every permission itself.

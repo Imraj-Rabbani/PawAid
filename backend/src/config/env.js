@@ -17,6 +17,10 @@ const env = {
     // rate limiting reads the client IP through them
     TRUST_PROXY: Number(process.env.TRUST_PROXY ?? 0),
     CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+    // the login cookie: Secure in production (HTTPS only), and SameSite=none when
+    // the frontend is on a different site from the API (e.g. vercel.app and onrender.com)
+    COOKIE_SECURE: process.env.COOKIE_SECURE === "true",
+    COOKIE_SAME_SITE: (process.env.COOKIE_SAME_SITE ?? "lax").toLowerCase(),
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,

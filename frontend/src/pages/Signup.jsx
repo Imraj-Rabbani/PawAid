@@ -58,8 +58,7 @@ const SignUp = () => {
         try {
             const response = await authService.signUp(formData);
     
-            if (response.token) {
-                localStorage.setItem('token', response.token);
+            if (response.user) {
                 localStorage.setItem('user', JSON.stringify(response.user));
             }
     
@@ -80,7 +79,6 @@ const SignUp = () => {
         setLoading(true);
         try {
             const response = await authService.signInWithGoogle(credential);
-            localStorage.setItem('token', response.token);
             localStorage.setItem('user', JSON.stringify(response.user));
             navigate('/');
         } catch (error) {

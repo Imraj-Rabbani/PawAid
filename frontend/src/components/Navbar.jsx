@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "../services/api";
+import api, { authService } from "../services/api";
 import Icon from "./Icon";
 import { useCart } from "../context/cartContext";
 
@@ -46,10 +46,21 @@ export default function Navbar({ user: userProp }) {
     navigate(`/profile/${user.id}`);
   };
 
-  const handleLogout = () => {
+  const signOutWith = async (endSessions) => {
+    try {
+      await endSessions();
+    } catch {
+      // signed out locally either way; the cookie expires on its own
+    }
     localStorage.removeItem("user");
-    localStorage.removeItem("token");
     navigate("/signin");
+  };
+
+  const handleLogout = () => signOutWith(authService.signOut);
+
+  const handleLogoutEverywhere = () => {
+    if (!window.confirm("Log out on every device, including this one?")) return;
+    signOutWith(authService.signOutEverywhere);
   };
 
   return (
@@ -123,7 +134,7 @@ export default function Navbar({ user: userProp }) {
                   </button>
                 )}
 
-                <AccountMenu user={user} onProfile={goToProfile} onLogout={handleLogout} />
+                <AccountMenu user={user} onProfile={goToProfile} onLogout={handleLogout} onLogoutEverywhere={handleLogoutEverywhere} />
               </>
             ) : (
               <>
@@ -186,7 +197,7 @@ export default function Navbar({ user: userProp }) {
 }
 
 // The avatar opens a small menu with the profile link and logout
-function AccountMenu({ user, onProfile, onLogout }) {
+function AccountMenu({ user, onProfile, onLogout, onLogoutEverywhere }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -264,6 +275,14 @@ function AccountMenu({ user, onProfile, onLogout }) {
           >
             <Icon name="logout" className="text-[20px]" />
             Logout
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => choose(onLogoutEverywhere)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-error rounded-xl hover:bg-error-container/50 transition"
+          >
+            <Icon name="devices" className="text-[20px]" />
+            Log out of all devices
           </button>
         </div>
       )}

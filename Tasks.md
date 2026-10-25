@@ -31,7 +31,7 @@ This stage has no user-facing features yet — it's the skeleton everything else
 - [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 22 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey).
 - [x] Initial migration applied to PostgreSQL (12 migrations to date)
 - [~] `config/env.js` set up; the DB client lives in `src/db.js` (Prisma 7 with the `pg` adapter)
-- [~] JWT-based auth: register, login. Logout is client side (token removed from the browser); no refresh token, 7-day expiry instead (PRD D24)
+- [~] JWT-based auth: register, login. Token in an httpOnly cookie, backed by a server-side session: `POST /signout` and `POST /signout/all` revoke it, and suspension ends all of a user's sessions; no refresh token, 7-day expiry instead (PRD D24)
 - [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
 - [x] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
 - [~] Global error handler inline in `server.js`. Zod body validation is shared middleware (`validateBody`, schemas in `src/schemas/`)
@@ -252,6 +252,6 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 ## Later (post-MVP)
 
 - Real payment gateway (SSLCommerz) for wallet top ups and online checkout, using the existing `payment.services.js` seam
-- Refresh tokens / server-side logout
+- Refresh tokens (server-side logout is done through sessions)
 - Anonymous donations
 - More than one volunteer per rescue

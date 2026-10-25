@@ -2,28 +2,22 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000/api';
 
+// The login token is an httpOnly cookie the browser sends itself; scripts can't read it.
+// The backend refuses changes without X-Requested-With, which other sites can't add.
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: { 'X-Requested-With': 'XMLHttpRequest' },
 });
 
-// Add token to requests if it exists
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// tokens saved by earlier versions, before the cookie
+localStorage.removeItem('token');
 
 // Handle response errors globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
     }
     return Promise.reject(error);
@@ -49,6 +43,13 @@ export const authService = {
   signInWithGoogle: async (credential) => {
     const response = await api.post('/signin/google', { credential });
     return response.data;
+  },
+  signOut: async () => {
+    await api.post('/signout');
+  },
+  // ends every session, for when someone else may be using the account
+  signOutEverywhere: async () => {
+    await api.post('/signout/all');
   },
 };
 

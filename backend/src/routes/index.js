@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { googleLogin, login, register } from "../modules/auth/auth.controller.js";
+import { googleLogin, login, logout, logoutEverywhere, register } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, assignPost, createPost, createRescueUpdate, deletePost, getPost, listAreas, listMyPosts, listPosts, listRescueUpdates, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
@@ -44,6 +44,8 @@ const router = Router()
 router.post("/signup", signupLimit, validateBody(registerSchema), register)
 router.post("/signin", signinIpLimit, validateBody(loginSchema), signinEmailLimit, login)
 router.post("/signin/google", googleSigninLimit, validateBody(googleLoginSchema), googleLogin)
+router.post("/signout", logout)
+router.post("/signout/all", requireAuth, logoutEverywhere)
 
 
 router.get("/profile/:userId", requireAuth, getUserProfile)

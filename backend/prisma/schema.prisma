@@ -169,6 +169,7 @@ model User {
   financialTransactions FinancialTransaction[] @relation("RelatedUser")
   idempotencyKeys IdempotencyKey[]
   adminAuditLogs AdminAuditLog[]
+  sessions Session[]
   @@map("users")
 }
 // ========================================
@@ -618,4 +619,17 @@ model AdminAuditLog {
   @@index([adminId])
   @@index([targetType, targetId])
   @@map("admin_audit_logs")
+}
+
+// One per sign-in. The login token names its session, and a token only works while
+// its session row exists, so deleting rows signs people out on the server
+// (sign out, sign out everywhere, suspension) instead of waiting for the token to expire.
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("sessions")
 }

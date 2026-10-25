@@ -4,6 +4,7 @@ import app from "../src/app.js"
 import { prisma } from "../src/db.js"
 import router from "../src/routes/index.js"
 import { generateToken } from "../src/modules/auth/auth.utils.js"
+import { startSession } from "../src/modules/auth/auth.services.js"
 import { createPost, createUser, createVolunteer, newKey, post, topUp } from "./helpers.js"
 
 // Who may call what. The routes are read from the router, so a new route is
@@ -14,6 +15,7 @@ const PUBLIC_ROUTES = new Set([
   "POST /signup",
   "POST /signin",
   "POST /signin/google",
+  "POST /signout",
   "GET /home/summary",
   "GET /transparency",
   "GET /marketplace/products",
@@ -89,7 +91,7 @@ describe("signing in is required", () => {
   })
 
   it("rejects a token for a user who no longer exists", async () => {
-    const token = generateToken({ userId: crypto.randomUUID(), email: "gone@test.local" })
+    const { token } = generateToken({ userId: crypto.randomUUID(), email: "gone@test.local", sessionId: crypto.randomUUID() })
     const res = await request(app).get("/api/wallet/me").set("Authorization", `Bearer ${token}`)
     expect(res.status).toBe(401)
   })
@@ -183,7 +185,9 @@ describe("signing up and in", () => {
     expect(signin.status).toBe(200)
     expect(signup.body.user).not.toHaveProperty("password")
     expect(signin.body.user).not.toHaveProperty("password")
-    expect(signin.body.token).toEqual(expect.any(String))
+    // the token only travels in the httpOnly cookie, never where page scripts can read it
+    expect(signin.body).not.toHaveProperty("token")
+    expect(signin.headers["set-cookie"][0]).toMatch(/^token=.+; .*HttpOnly/)
   })
 
   it("gives every new user an empty wallet", async () => {
@@ -202,7 +206,17 @@ describe("signing up and in", () => {
     await request(app).post("/api/signup").send(credentials)
     const res = await request(app).post("/api/signin").send({ email: credentials.email, password: "wrong-password" })
     expect(res.status).toBe(400)
-    expect(res.body.token).toBeUndefined()
+    expect(res.headers["set-cookie"]).toBeUndefined()
+  })
+
+  it("gives the same answer for an unknown email as for a wrong password", async () => {
+    await request(app).post("/api/signup").send(credentials)
+    const wrongPassword = await request(app).post("/api/signin").send({ email: credentials.email, password: "wrong-password" })
+    const unknownEmail = await request(app).post("/api/signin").send({ email: "nobody@test.local", password: "wrong-password" })
+
+    expect(unknownEmail.status).toBe(wrongPassword.status)
+    expect(unknownEmail.body).toEqual(wrongPassword.body)
+    expect(unknownEmail.body.message).toBe("Invalid email or password")
   })
 
   it("refuses a suspended user", async () => {
@@ -212,7 +226,87 @@ describe("signing up and in", () => {
     const res = await request(app).post("/api/signin").send({ email: credentials.email, password: credentials.password })
 
     expect(res.status).toBe(403)
-    expect(res.body.token).toBeUndefined()
+    expect(res.headers["set-cookie"]).toBeUndefined()
+  })
+})
+
+describe("the login cookie", () => {
+  const credentials = { name: "Cookie Person", email: "cookie.person@test.local", password: "correct-horse-1" }
+  const signIn = async () => {
+    await request(app).post("/api/signup").send(credentials)
+    const res = await request(app).post("/api/signin").send({ email: credentials.email, password: credentials.password })
+    return res.headers["set-cookie"][0].split(";")[0]
+  }
+
+  it("signs requests in", async () => {
+    const cookie = await signIn()
+    const res = await request(app).get("/api/wallet/me").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+  })
+
+  it("is refused on a change without the X-Requested-With header another site can't send", async () => {
+    const cookie = await signIn()
+    const res = await request(app).post("/api/signout").set("Cookie", cookie)
+    expect(res.status).toBe(403)
+  })
+
+  it("is cleared on sign out", async () => {
+    const cookie = await signIn()
+    const res = await request(app).post("/api/signout").set("Cookie", cookie).set("X-Requested-With", "XMLHttpRequest")
+    expect(res.status).toBe(200)
+    expect(res.headers["set-cookie"][0]).toMatch(/^token=;.*Expires=Thu, 01 Jan 1970/)
+  })
+})
+
+describe("ending sessions on the server", () => {
+  // a copied token, e.g. stolen before sign out
+  const asToken = (token) => request(app).get("/api/wallet/me").set("Authorization", `Bearer ${token}`)
+
+  it("stops a copied token working once its session signs out", async () => {
+    const user = await createUser()
+
+    await request(app).post("/api/signout").set("Authorization", `Bearer ${user.token}`)
+
+    expect((await asToken(user.token)).status).toBe(401)
+  })
+
+  it("leaves the user's other sessions signed in on a normal sign out", async () => {
+    const user = await createUser()
+    const { token: laptop } = await startSession(user)
+
+    await request(app).post("/api/signout").set("Authorization", `Bearer ${user.token}`)
+
+    expect((await asToken(laptop)).status).toBe(200)
+  })
+
+  it("signs out every device on sign out everywhere", async () => {
+    const user = await createUser()
+    const { token: laptop } = await startSession(user)
+
+    const res = await request(app).post("/api/signout/all").set("Authorization", `Bearer ${user.token}`)
+
+    expect(res.status).toBe(200)
+    expect((await asToken(user.token)).status).toBe(401)
+    expect((await asToken(laptop)).status).toBe(401)
+  })
+
+  it("keeps a suspended user signed out after they are reactivated", async () => {
+    const admin = await createUser({ role: "ADMIN" })
+    const user = await createUser()
+    const setStatus = (status) => request(app).patch(`/api/admin/users/${user.id}/status`)
+      .set("Authorization", `Bearer ${admin.token}`).send({ status })
+
+    expect((await setStatus("SUSPENDED")).status).toBe(200)
+    expect((await setStatus("ACTIVE")).status).toBe(200)
+
+    expect((await asToken(user.token)).status).toBe(401)
+  })
+
+  it("rejects a validly signed token that names no session", async () => {
+    const user = await createUser()
+    const { token } = generateToken({ userId: user.id, email: user.email })
+
+    expect((await asToken(token)).status).toBe(401)
   })
 })
 

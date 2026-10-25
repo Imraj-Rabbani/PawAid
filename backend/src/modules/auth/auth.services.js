@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import env from "../../config/env.js";
 import { prisma } from "../../db.js";
+import { generateToken } from "./auth.utils.js";
 
 const googleClient = new OAuth2Client();
 
@@ -86,4 +87,42 @@ export async function findOrCreateGoogleUser({ sub, email, name }) {
             wallet: { create: {} },
         }
     })
+}
+
+
+// Signs a user in: records a session and returns a token that names it.
+// Also clears the user's expired sessions so the table doesn't grow forever.
+export async function startSession(user) {
+    const sessionId = crypto.randomUUID()
+    const { token, expiresAt } = generateToken({ userId: user.id, email: user.email, sessionId })
+
+    await prisma.$transaction([
+        prisma.session.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } }),
+        prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } }),
+    ])
+
+    return { token, expiresAt }
+}
+
+// The session's user, or null if the session was ended, has expired, or doesn't match the token
+export async function findSessionUser({ sessionId, userId }) {
+    if (!sessionId) return null
+
+    const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        include: { user: true },
+    })
+    if (!session || session.userId !== userId || session.expiresAt <= new Date()) return null
+
+    return session.user
+}
+
+export async function endSession(sessionId) {
+    await prisma.session.deleteMany({ where: { id: sessionId } })
+}
+
+// Signs the user out on every device. Takes a transaction client so it can run
+// alongside other changes (e.g. suspending the user).
+export async function endAllSessions(userId, db = prisma) {
+    await db.session.deleteMany({ where: { userId } })
 }

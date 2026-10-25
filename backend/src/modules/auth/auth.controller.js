@@ -1,7 +1,12 @@
 import bcrypt from "bcryptjs";
-import { generateToken, sanitizeUser } from "./auth.utils.js"
-import { createUser, findOrCreateGoogleUser, findUser, verifyGoogleCredential } from "./auth.services.js";
+import { clearAuthCookie, readToken, sanitizeUser, setAuthCookie, verifyToken } from "./auth.utils.js"
+import { createUser, endAllSessions, endSession, findOrCreateGoogleUser, findUser, startSession, verifyGoogleCredential } from "./auth.services.js";
 
+const INVALID_CREDENTIALS = "Invalid email or password"
+
+// compared against when the email is unknown, so that path takes as long as a real
+// password check and response timing doesn't reveal which emails are registered
+const DUMMY_HASH = bcrypt.hashSync("dummy-password-for-timing", 10)
 
 
 
@@ -12,15 +17,11 @@ export async function register(req, res) {
 
     const user = await createUser(req.body)
 
-    const token = generateToken({
-        userId: user.id,
-        email: user.email
-    })
+    setAuthCookie(res, await startSession(user))
 
     return res.status(201).json({
         message: "Successfully Signed Up",
         user: sanitizeUser(user),
-        token: token
     })
 }
 
@@ -28,8 +29,9 @@ export async function login(req, res) {
 
     const user = await findUser(req.body.email)
     if (!user) {
+        await bcrypt.compare(req.body.password, DUMMY_HASH)
         return res.status(400).json({
-            message: "No user with this email",
+            message: INVALID_CREDENTIALS,
         });
     }
 
@@ -44,7 +46,7 @@ export async function login(req, res) {
 
     if (!matchedPassword) {
         return res.status(400).json({
-            message: "Credentials do not match",
+            message: INVALID_CREDENTIALS,
         });
     }
 
@@ -55,15 +57,11 @@ export async function login(req, res) {
         });
     }
 
-    const token = generateToken({
-        userId: user.id,
-        email: user.email
-    })
+    setAuthCookie(res, await startSession(user))
 
     return res.json({
         message: "Successfully Logged In",
         user: sanitizeUser(user),
-        token: token
     })
 }
 
@@ -91,14 +89,33 @@ export async function googleLogin(req, res) {
         });
     }
 
-    const token = generateToken({
-        userId: user.id,
-        email: user.email
-    })
+    setAuthCookie(res, await startSession(user))
 
     return res.json({
         message: "Successfully Logged In",
         user: sanitizeUser(user),
-        token: token
     })
+}
+
+// Ends this session on the server too, so the token stops working even if it was copied
+export async function logout(req, res) {
+    const token = readToken(req)
+    if (token) {
+        try {
+            const { sessionId } = verifyToken(token)
+            if (sessionId) await endSession(sessionId)
+        } catch {
+            // an expired or forged token has no session worth ending
+        }
+    }
+
+    clearAuthCookie(res)
+    return res.json({ message: "Signed out" })
+}
+
+// For "someone else is using my account": every device has to sign in again
+export async function logoutEverywhere(req, res) {
+    await endAllSessions(req.user.id)
+    clearAuthCookie(res)
+    return res.json({ message: "Signed out on every device" })
 }

@@ -1234,7 +1234,7 @@ The allocation creates a donation and a `RESCUE_FUND_ALLOCATION` financial trans
 Because the platform handles user identity and financial information, the backend implements:
 
 - Password hashing (bcrypt) — **done**
-- Authentication tokens (JWT, 7-day expiry, sent as a Bearer token) — **done**
+- Authentication tokens (JWT, 7-day expiry, in an httpOnly cookie) — **done**
 - Role-based authorization (admin and active-volunteer middleware) — **done**
 - Input validation (Zod) — **done**
 - File upload validation: JPEG, PNG, GIF or WebP checked by file contents, 5 MB limit, file count per route — **done**
@@ -1306,7 +1306,7 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 
 - ✅ Registration
 - ✅ Login
-- ✅ Logout (client side: the token is cleared from the browser)
+- ✅ Logout (`POST /signout` ends the session on the server and clears the cookie; "Log out of all devices" ends every session)
 - ✅ Role management
 
 ### Volunteers

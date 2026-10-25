@@ -1,18 +1,10 @@
-import { findById } from "../modules/auth/auth.services.js"
-import { verifyToken } from "../modules/auth/auth.utils.js"
+import { findSessionUser } from "../modules/auth/auth.services.js"
+import { readToken, verifyToken } from "../modules/auth/auth.utils.js"
 
 
 export async function requireAuth(req, res, next) {
     try {
-        const authHeader = req.headers.authorization
-
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({
-                message: "No header found"
-            })
-        }
-
-        const token = authHeader.split(" ")[1].trim()
+        const token = readToken(req)
 
         if (!token) {
             return res.status(401).json({
@@ -20,16 +12,13 @@ export async function requireAuth(req, res, next) {
             })
         }
 
-        const decoded = verifyToken(token)
-        const userId = decoded.userId
-
-        const user = await findById(userId)
+        const user = await findSessionUser(verifyToken(token))
 
         if (!user) {
-            return res.status(401).json({ message: "User no longer exists" });
+            return res.status(401).json({ message: "Your session has ended. Please sign in again." });
         }
 
-        // 401 so the frontend drops the stored token and signs a suspended user out
+        // 401 so the frontend drops the stored user and signs a suspended user out
         if (user.status !== "ACTIVE") {
             return res.status(401).json({ message: "Your account has been suspended" });
         }
@@ -54,11 +43,10 @@ export async function requireAuth(req, res, next) {
 // A missing or bad token is not an error here, the request just continues as a guest.
 export async function optionalAuth(req, res, next) {
     try {
-        const authHeader = req.headers.authorization
+        const token = readToken(req)
 
-        if (authHeader?.startsWith("Bearer ")) {
-            const decoded = verifyToken(authHeader.split(" ")[1].trim())
-            const user = await findById(decoded.userId)
+        if (token) {
+            const user = await findSessionUser(verifyToken(token))
 
             if (user && user.status === "ACTIVE") {
                 req.user = {
