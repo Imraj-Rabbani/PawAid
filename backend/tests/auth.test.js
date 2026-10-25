@@ -258,6 +258,16 @@ describe("the login cookie", () => {
   })
 })
 
+describe("security headers", () => {
+  it("are set on API responses", async () => {
+    const res = await request(app).get("/api/transparency")
+    expect(res.headers["x-content-type-options"]).toBe("nosniff")
+    expect(res.headers["strict-transport-security"]).toBeDefined()
+    expect(res.headers["content-security-policy"]).toBeDefined()
+    expect(res.headers["x-powered-by"]).toBeUndefined()
+  })
+})
+
 describe("ending sessions on the server", () => {
   // a copied token, e.g. stolen before sign out
   const asToken = (token) => request(app).get("/api/wallet/me").set("Authorization", `Bearer ${token}`)
