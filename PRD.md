@@ -181,6 +181,20 @@ A wallet with a zero balance is created for every user at sign up.
 
 Additional account information (phone, address, profile picture) can be added from the profile page after registration.
 
+Users can also sign up and sign in with Google. The Google account's email must be verified; if an email/password account already uses that email, the Google account is linked to it rather than creating a second account.
+
+---
+
+## 5.1.1 Forgotten Passwords
+
+A user who forgets their password asks for a reset link from the sign in page:
+
+- The reply is the same whether or not the email has an account, so the form can't be used to find out who is registered.
+- The link is emailed, works once, and expires after 30 minutes. Asking again replaces the earlier link.
+- Setting the new password signs the account out on every device.
+- Suspended accounts don't get a link.
+- Accounts created through Google sign-in can use it to add a password.
+
 ---
 
 ## 5.2 Volunteer Application
@@ -1246,6 +1260,12 @@ Because the platform handles user identity and financial information, the backen
 - Database transaction consistency, including atomic balance checks — **done**
 - Suspended accounts are signed out on their next request — **done**
 - Audit logs for administrative actions (append only, viewable in the admin panel) — **done**
+- Server-side sessions: signing out, signing out of all devices, suspension and password resets revoke the login token immediately — **done**
+- CSRF protection for the login cookie (requests that change data need an `X-Requested-With` header) — **done**
+- Rate limiting on sign in, sign up, Google sign-in, password reset and money-moving routes — **done**
+- Password reset by single-use, 30 minute emailed link; only a hash of the token is stored (§5.1.1) — **done**
+- Security headers (HSTS, nosniff, frame denial, strict content security policy) — **done**
+- Image storage kept inside the Cloudflare R2 free tier: the admin is emailed at 80% of the monthly allowance and uploads pause at 90% — **done**
 
 NID information is never publicly visible on volunteer profiles. Contact details, wallet and NID on a user profile are only visible to the owner and admins.
 
@@ -1306,6 +1326,8 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 
 - ✅ Registration
 - ✅ Login
+- ✅ Google sign-in
+- ✅ Forgotten password reset by email
 - ✅ Logout (`POST /signout` ends the session on the server and clears the cookie; "Log out of all devices" ends every session)
 - ✅ Role management
 
@@ -1376,7 +1398,8 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 
 - ✅ Duplicate-payment prevention
 - ✅ Audit logs for admin actions
-- ⬜ Automated tests (ledger reconciliation, end-to-end MVP flow)
+- ✅ Rate limiting, sessions, CSRF protection and security headers
+- 🟡 Automated tests: every flow and the ledger reconciliation are tested; a single end-to-end test of the §43 flow is still to be written
 
 ---
 

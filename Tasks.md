@@ -1,13 +1,13 @@
 # PawAid — Build Plan
 
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-27
 
 | Stage | Status |
 | --- | --- |
 | 1 — Foundation | ✅ Done (with changes) |
 | 2 — Volunteer System | ✅ Done |
 | 3 — Community / Rescue Posts | ✅ Done, extended |
-| 4 — Ledger Core | 🟡 Built, tests missing |
+| 4 — Ledger Core | ✅ Done (with changes) |
 | 5 — Donations & Wallet | ✅ Done (with changes) |
 | 6 — Marketplace | ✅ Done (with changes) |
 | 7 — PawAid Fund (Rescue Fund) | ✅ Done (with changes) |
@@ -28,19 +28,26 @@ This stage has no user-facing features yet — it's the skeleton everything else
 
 **Deliverables:**
 
-- [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 22 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey).
-- [x] Initial migration applied to PostgreSQL (12 migrations to date)
+- [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 26 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey, AdminAuditLog, Session, UsageAlert, PasswordReset).
+- [x] Initial migration applied to PostgreSQL (17 migrations to date)
 - [~] `config/env.js` set up; the DB client lives in `src/db.js` (Prisma 7 with the `pg` adapter)
 - [~] JWT-based auth: register, login. Token in an httpOnly cookie, backed by a server-side session: `POST /signout` and `POST /signout/all` revoke it, and suspension ends all of a user's sessions; no refresh token, 7-day expiry instead (PRD D24)
 - [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
 - [x] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
-- [~] Global error handler inline in `server.js`. Zod body validation is shared middleware (`validateBody`, schemas in `src/schemas/`)
+- [~] Global error handler inline in `app.js` (`server.js` only starts the app, so tests can drive `app.js` directly). Zod body validation is shared middleware (`validateBody`, schemas in `src/schemas/`)
+
+**Added beyond the plan:**
+
+- [x] Google sign-in (`POST /signin/google`): the ID token is verified server side; an existing email/password account with the same verified email is linked rather than duplicated
+- [x] Forgot password (`POST /password/forgot`, `POST /password/reset`, `/forgot-password`, `/reset-password`): emailed single-use link, 30 minute expiry, only a hash of the token stored, same reply whether or not the email has an account, rate limited per IP and per email, and a reset signs the account out everywhere. Google-only accounts can use it to add a password
+- [x] Email sending through Resend (`email.services.js`), used by password resets and the R2 usage alerts
 
 **Key considerations:**
 
 - Password hashing with bcrypt from day one — done
+- Password reset emails only reach real users once a domain is verified in Resend and set as `EMAIL_FROM`; until then Resend delivers only to the account owner's address
 - Role escalation: applying creates a `VolunteerProfile` and sets the user's role to `VOLUNTEER` in one transaction; revocation changes the profile status, not the role (PRD D5)
-- Uploads go to **Cloudflare R2** via `upload.services.js`, not Cloudinary (PRD D24)
+- Uploads go to **Cloudflare R2** via `upload.services.js`, not Cloudinary (PRD D24). A free tier guard (`r2Usage.services.js`) checks usage every 15 minutes, emails at 80% and pauses uploads at 90% (see Stage 9)
 
 ---
 
@@ -111,14 +118,15 @@ Wallet balances must never be the sole source of truth (§31, §40). Instead of 
 - [~] Money as whole-taka integers (`Int` columns); no `money.util.js` needed since amounts are never fractional (PRD D21)
 - [~] `wallet.services.js` (`creditWallet`, `debitWallet` with an atomic balance check) and `fund.services.js` (`creditFund`, `debitFund`), always called inside a DB transaction
 - [~] `FinancialTransaction` + `WalletTransaction` write paths for the implemented types: INCOME, DONATION, TRANSFER, ORDER_PAYMENT, REFUND, MARKETPLACE_PROFIT, RESCUE_FUND_ALLOCATION (PRD D20)
-- [ ] Reconciliation query/test: sum of a wallet's transactions == wallet.balance
-- [ ] Unit tests for the wallet and fund services
+- [x] Reconciliation check: `findLedgerProblems` (`ledger.services.js`) compares wallet balances, post totals and the PawAid Fund against their transaction rows. Tests call it after every money flow, and `npm run check:ledger` runs it against a real database
+- [~] Wallet and fund services are tested through the API flows that use them (`donations`, `orders`, `ledger`, `concurrency` test files) rather than as isolated unit tests
 
 **Key considerations:**
 
 - Every write to `Wallet.balance` happens in the same DB transaction as its `WalletTransaction` row — done
 - DB constraints: a donation has exactly one source (user or fund); the fund can't be overdrawn
-- **No test suite exists yet** (`backend/package.json` has a placeholder `test` script). This is the main gap in this stage.
+- Tests run with Vitest and supertest against a throwaway embedded Postgres (`npm test`), so they never touch a real database
+- Concurrency tests check that simultaneous donations, transfers, checkouts, fund donations and rescue claims can't overspend or pay twice
 
 ---
 
@@ -233,15 +241,19 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 - [x] File upload validation: JPEG, PNG, GIF or WebP only, checked by magic bytes (the declared MIME type is not trusted), 5 MB, per-route file counts; the frontend pickers check the type too
 - [x] NID never appears in any public or list response (admin volunteer list only)
 - [x] Every multi-step financial operation wrapped in a DB transaction
-- [ ] End-to-end test of the full MVP success flow (PRD §43): register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview
+- [ ] End-to-end test of the full MVP success flow (PRD §43). Each step is covered by its own tests, but no single test runs the whole chain: register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview
 
 **Open items found while updating the docs:**
 
 - [ ] **Public donations page shows donor names and amounts** (`GET /api/donations`, `/donations`). This conflicts with PRD §41. Decide: hide donor identities, or allow it and add an "anonymous" option
-- [ ] Reconciliation check and unit tests for the wallet/fund services (from Stage 4)
+- [x] Reconciliation check and tests for the wallet/fund services (from Stage 4)
 - [x] `JWT_SECRET` is required (32+ characters); the server fails at startup without it
 - [x] Rate limiting on auth and money-moving routes (`rateLimit.middleware.js`; in-memory, so per process. Set `TRUST_PROXY` when deployed behind a proxy)
-- [ ] Update `Architecture.md`: still describes Cloudinary, `ledger.service.js`, `rbac.middleware.js` and the planned folder layout
+- [x] Update `Architecture.md` to match the code (R2, the wallet/fund services, the split RBAC middleware, the real folder layout)
+- [x] Sessions: the login token is an httpOnly cookie backed by a `Session` row, so sign out, sign out everywhere, suspension and password resets revoke it on the server. Changes need an `X-Requested-With` header (CSRF)
+- [x] Security headers with `helmet` (HSTS, nosniff, frame denial, strict CSP)
+- [x] R2 free tier guard: usage read from Cloudflare's analytics API every 15 minutes; email at `R2_WARN_PERCENT` (80%), uploads refused with a 503 at `R2_BLOCK_PERCENT` (90%) of storage or Class A operations. Image reads from the public bucket can't be stopped by the server, so they only trigger an email
+- [x] Forgot password flow (see Stage 1)
 
 **Key considerations:**
 

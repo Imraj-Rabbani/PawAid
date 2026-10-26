@@ -1,6 +1,6 @@
 # PawAid — Architecture
 
-**Last updated:** 2026-10-20. This describes the code as built. For product rules see `PRD.md`; for build status see `Tasks.md`.
+**Last updated:** 2026-10-27. This describes the code as built. For product rules see `PRD.md`; for build status see `Tasks.md`.
 
 ---
 
@@ -19,14 +19,18 @@ PawAid is a **PERN** app (PostgreSQL, Express, React, Node.js): a React single-p
 ┌────────────▼─────────────┐
 │  Express 5 API           │  localhost:3000
 │  ┌────────────────────┐  │
-│  │ Middleware         │  │  auth, admin, active volunteer,
+│  │ Middleware         │  │  helmet, CSRF, rate limits, auth,
+│  │                    │  │  admin, active volunteer,
 │  │                    │  │  idempotency, upload (multer)
 │  ├────────────────────┤  │
 │  │ Modules            │  │  one controller per feature
 │  ├────────────────────┤  │
-│  │ Services           │  │  wallet, fund, payment, upload
+│  │ Services           │  │  wallet, fund, ledger, payment,
+│  │                    │  │  upload, R2 usage, email
 │  └────────────────────┘  │
 └──────┬─────────────┬─────┘
+       │             │        outbound HTTPS: Google (sign-in),
+       │             │        Resend (email), Cloudflare analytics
        │ Prisma 7    │ S3 API
        │ (pg adapter)│
 ┌──────▼──────────┐ ┌▼───────────────────────┐
@@ -37,7 +41,7 @@ PawAid is a **PERN** app (PostgreSQL, Express, React, Node.js): a React single-p
                     └────────────────────────┘
 ```
 
-There is no background worker or message queue. The one scheduled job (clearing expired idempotency keys) runs on a timer inside the API process.
+There is no background worker or message queue. Two scheduled jobs run on timers inside the API process: clearing expired idempotency keys (hourly) and checking R2 usage against the free tier (every 15 minutes, §4.5).
 
 ---
 
@@ -51,10 +55,13 @@ There is no background worker or message queue. The one scheduled job (clearing 
 | Backend | Node.js, Express 5, run with `tsx` + `nodemon` in dev |
 | Database | PostgreSQL |
 | ORM | Prisma 7 (`prisma-client` generator, `@prisma/adapter-pg`, `relationJoins` preview) |
-| Auth | JWT (`jsonwebtoken`), bcrypt (`bcryptjs`) |
+| Auth | JWT (`jsonwebtoken`) in an httpOnly cookie, server-side sessions, bcrypt (`bcryptjs`), Google sign-in (`google-auth-library`) |
+| Security | `helmet` (headers), `express-rate-limit` (in memory) |
+| Email | Resend HTTP API (`fetch`, no SDK) |
 | Validation | Zod 4 |
 | File uploads | multer (memory storage) → Cloudflare R2 via `@aws-sdk/client-s3` |
 | Payments | Simulated (wallet top up, cash on delivery); SSLCommerz-ready seam in `payment.services.js` |
+| Tests | Vitest + supertest against a throwaway embedded Postgres (`embedded-postgres`) |
 | Monorepo tooling | Root `package.json` with `concurrently` |
 
 ---
@@ -72,29 +79,36 @@ PawAid/
 │   │   ├── schema.prisma
 │   │   └── migrations/          # one folder per migration
 │   ├── prisma7.config.ts        # Prisma CLI config (schema + migrations path, DATABASE_URL)
-│   ├── tests/                   # empty — no tests yet
+│   ├── scripts/check-ledger.js  # npm run check:ledger: reconcile a real database, read only
+│   ├── tests/                   # Vitest: one file per area, setup/ starts the throwaway Postgres
 │   └── src/
-│       ├── server.js            # Express app, CORS, JSON, /api router, error handler, key cleanup timer
+│       ├── app.js               # Express app: helmet, CORS, JSON, CSRF, /api router, error handler
+│       ├── server.js            # app.listen + timers (idempotency key cleanup, R2 usage guard)
 │       ├── db.js                # PrismaClient on the pg adapter
 │       ├── config/env.js        # reads .env, with defaults
 │       ├── generated/prisma/    # Prisma client output (generated, don't edit)
 │       ├── routes/index.js      # every route, with its middleware chain
 │       ├── middleware/
 │       │   ├── auth.middleware.js         # requireAuth, optionalAuth
+│       │   ├── csrf.middleware.js         # requireCsrfHeader
+│       │   ├── rateLimit.middleware.js    # per-route limits for auth and money routes
 │       │   ├── admin.middleware.js        # requireAdmin
 │       │   ├── volunteer.middleware.js    # requireActiveVolunteer
 │       │   ├── idempotency.middleware.js  # requireIdempotencyKey, cleanupIdempotencyKeys
-│       │   ├── upload.middleware.js       # multer + magic-byte check: JPEG/PNG/GIF/WebP, 5 MB
+│       │   ├── upload.middleware.js       # R2 capacity check + multer + magic-byte check: JPEG/PNG/GIF/WebP, 5 MB
 │       │   └── validate.middleware.js     # validateBody(schema): Zod check of req.body
 │       ├── schemas/             # Zod request-body schemas, one file per module (+ common.schemas.js)
 │       ├── services/
 │       │   ├── audit.services.js    # logAdminAction, changedFields
 │       │   ├── wallet.services.js   # creditWallet, debitWallet
 │       │   ├── fund.services.js     # PawAid Fund: creditFund, debitFund, refundFund
+│       │   ├── ledger.services.js   # findLedgerProblems: balances vs their transaction rows
 │       │   ├── payment.services.js  # simulated external provider (not wired in)
-│       │   └── upload.services.js   # uploadToR2, deleteFromR2
+│       │   ├── upload.services.js   # uploadToR2, deleteFromR2
+│       │   ├── r2Usage.services.js  # R2 free tier guard: usage check, alerts, upload pause
+│       │   └── email.services.js    # sendEmail through Resend
 │       └── modules/
-│           ├── auth/          # register, login (controller + services + utils)
+│           ├── auth/          # sign up/in, Google, sessions, password reset (controller + services + utils)
 │           ├── user/          # own profile, profile picture
 │           ├── volunteer/     # apply, directory, public profile, update
 │           ├── rescue/        # areas, posts, feed, upvotes, assignment, progress, updates
@@ -115,7 +129,7 @@ PawAid/
         ├── main.jsx           # BrowserRouter + CartProvider
         ├── App.jsx            # routes
         ├── services/
-        │   ├── api.js         # axios instance, token interceptor, 401 handling
+        │   ├── api.js         # axios instance (cookie + X-Requested-With), 401 handling
         │   └── idempotency.js # useIdempotencyKey, withIdempotencyKey
         ├── context/           # cart: CartProvider, cartContext, useCartSync
         ├── pages/             # one component per route
@@ -131,7 +145,7 @@ PawAid/
             └── transparency/  # PawAid Fund donate modal (admins)
 ```
 
-Each backend module is a single `*.controller.js` (auth also has `services` and `utils`). Request bodies are validated with Zod before the controller runs (`validateBody` on the route, schemas in `src/schemas/`); controllers talk to Prisma directly and call the shared services for anything that moves money. There is no separate repository or service layer per module.
+Each backend module is a single `*.controller.js` (auth also has `services`, `passwordReset.services` and `utils`). Request bodies are validated with Zod before the controller runs (`validateBody` on the route, schemas in `src/schemas/`); controllers talk to Prisma directly and call the shared services for anything that moves money. There is no separate repository or service layer per module.
 
 ---
 
@@ -141,24 +155,29 @@ Each backend module is a single `*.controller.js` (auth also has `services` and 
 
 ```text
 request
-  → cors (CORS_ORIGIN) → express.json()
+  → helmet → cors (CORS_ORIGIN) → express.json()
+  → requireCsrfHeader                       non-GET with the cookie needs X-Requested-With
   → /api router
+      → rate limiter                        auth, password reset and money routes
       → requireAuth | optionalAuth          who is calling
       → requireAdmin | requireActiveVolunteer   may they do this
       → requireIdempotencyKey               money-moving routes only
-      → upload.single / upload.array        multipart routes only
+      → upload.single / upload.array        multipart routes only; 503 while R2 uploads are paused
       → validateBody(schema)                routes that take a body: 400 or a parsed req.body
       → controller                          Prisma → JSON
   → error handler                           multer errors → 400, others → status or 500
 ```
 
-`validateBody` answers a bad body with `400 { message: "Validation failed", errors }` (Zod's `flatten().fieldErrors`); otherwise it replaces `req.body` with the parsed data, so controllers only ever see trimmed, coerced values and the fields the schema lists. It runs after `requireIdempotencyKey`, so a rejected body releases the key. URL parameters (`:postId` and so on) are still checked in the controller, which answers a malformed id with a 404. Controllers mostly handle their own errors and return `{ message, data }`. The global error handler in `server.js` catches anything thrown past them and never leaks a 500's details.
+`validateBody` answers a bad body with `400 { message: "Validation failed", errors }` (Zod's `flatten().fieldErrors`); otherwise it replaces `req.body` with the parsed data, so controllers only ever see trimmed, coerced values and the fields the schema lists. It runs after `requireIdempotencyKey`, so a rejected body releases the key. URL parameters (`:postId` and so on) are still checked in the controller, which answers a malformed id with a 404. Controllers mostly handle their own errors and return `{ message, data }`. The global error handler in `app.js` catches anything thrown past them and never leaks a 500's details.
 
 ### 4.2 Authentication and authorization
 
 - **Sign up / sign in** return `{ user }` and set the JWT as an httpOnly `token` cookie, so page scripts (and XSS) can't read it. Passwords are hashed with bcrypt (10 rounds). The JWT holds `userId`, `email` and `sessionId`, and expires after `JWT_EXPIRY` (default 7 days). Each sign-in creates a `sessions` row, and `requireAuth` only accepts a token whose session still exists, so the server can revoke tokens: `POST /signout` deletes that session, `POST /signout/all` deletes all of the user's sessions, and suspending a user deletes theirs. There are no refresh tokens; `requireAuth` already reads the database on every request, so checking the session costs nothing extra. `requireAuth` also accepts `Authorization: Bearer` (scripts, tests).
 - **CSRF:** `requireCsrfHeader` refuses any non-GET request that carries the cookie but not `X-Requested-With: XMLHttpRequest`. Another site can't add that header without passing CORS. Cookie flags come from `COOKIE_SECURE` and `COOKIE_SAME_SITE` (`none` when the frontend and API are on different sites).
-- **`requireAuth`** verifies the token, loads the user, and rejects anyone whose status isn't `ACTIVE` with a **401**. The frontend clears its token on any 401, so a suspended user is signed out on their next request.
+- **Google sign-in** (`POST /signin/google`): the browser sends the ID token from Google's button; the API verifies it against `GOOGLE_CLIENT_ID`, requires a verified email, and finds the user by `googleId`, links an existing account with the same email, or creates one. Google-only accounts have no password.
+- **Forgot password** (`POST /password/forgot`, `POST /password/reset`, `passwordReset.services.js`): the forgot route always gives the same reply and sends the email after responding, so neither the message nor the timing reveals whether the email is registered. The token is 32 random bytes; only its sha256 is stored in `password_resets`, with a 30 minute expiry, and a new request replaces the user's earlier rows. The link is `${APP_URL}/reset-password#token=…`: in the fragment so it never reaches a server log or a Referer header, and the page removes it from the address bar. The reset deletes the row inside a transaction (so two simultaneous uses can't both succeed), sets the password and ends all of the user's sessions.
+- **Rate limits** (`rateLimit.middleware.js`): sign in per IP and per email (failed attempts only), sign up and Google sign-in per IP, forgot password per IP and per email, reset per IP, and one budget per user across money routes. Counts are in memory, so they hold for one process and reset on restart; `TRUST_PROXY` must be set behind a proxy.
+- **`requireAuth`** verifies the token, checks its session, loads the user, and rejects anyone whose status isn't `ACTIVE` with a **401**. The frontend drops its cached user on any 401, so a suspended user is signed out on their next request.
 - **`optionalAuth`** is for public routes that show extra details to a signed-in viewer (e.g. whether they upvoted a post). A bad token just means "guest".
 - **`requireAdmin`** checks `role === "ADMIN"`. It is applied to the whole `/api/admin` prefix with `router.use`.
 - **`requireActiveVolunteer`** loads the caller's `VolunteerProfile` and requires `status === "ACTIVE"`. It checks the profile's status rather than the user's role, so revoking a volunteer takes effect on their next request. It puts the profile on `req.volunteer`.
@@ -170,7 +189,7 @@ All routes are under `/api` and defined in `src/routes/index.js`. Legend: 🔓 p
 
 | Area | Routes |
 |---|---|
-| Auth | `POST /signup` 🔓, `POST /signin` 🔓 |
+| Auth | `POST /signup` 🔓, `POST /signin` 🔓, `POST /signin/google` 🔓, `POST /signout` 🔓, `POST /signout/all` 👤, `POST /password/forgot` 🔓, `POST /password/reset` 🔓 |
 | Users | `GET /profile/:userId` 👤 (contact details, wallet and NID only for the owner or an admin), `PUT /profile/update` 👤, `PUT /users/profile-picture` 👤 |
 | Home & transparency | `GET /home/summary` 🔓, `GET /transparency` 🔓 |
 | Areas | `GET /area` 🔓, `POST /add-area` 🛡️ |
@@ -191,6 +210,18 @@ Static paths like `/rescue-post/mine` and `/volunteer/profile` are registered be
 ### 4.4 Uploads
 
 `upload.middleware.js` keeps files in memory (multer) and caps each file at 5 MB. It accepts JPEG, PNG, GIF and WebP only, decided by the file's magic bytes rather than the client's declared MIME type, and then overwrites `file.mimetype` with the detected type, so the R2 key extension and `ContentType` the controllers derive from it can be trusted. SVG is rejected because it can carry scripts. Each route sets its own file count. Controllers run their permission checks *before* uploading, so a rejected request never writes to R2, then call `uploadToR2(buffer, key, contentType)`, which returns the public URL that gets stored in the database. Keys are prefixed by kind: `rescue-posts/`, `rescue-updates/`, `rescue-expenses/`, `products/`, and so on.
+
+### 4.5 R2 free tier guard and email
+
+Cloudflare has no spending cap for R2, so `r2Usage.services.js` is the cap. Every 15 minutes (and once at startup) it asks Cloudflare's GraphQL analytics API for the whole account's usage since the start of the month (UTC): storage, Class A operations and Class B operations, against the free tier of 10 GB, 1M and 10M. Delete operations are free and not counted; any action not on the Class B list is counted as Class A.
+
+- At `R2_WARN_PERCENT` (80%) of any metric it emails `ALERT_EMAIL`.
+- At `R2_BLOCK_PERCENT` (90%) of storage or Class A, it pauses uploads: `requireR2Capacity`, the first step of `upload.single`/`upload.array`, answers **503** before multer reads the file, and `uploadToR2` refuses as a backstop. Uploads resume when a later check comes back under the limit, e.g. in the new month.
+- Class B is browsers loading images straight from the public bucket, which never touch the API, so at 90% it only emails, with instructions to disable the bucket's public URL.
+- After a restart, uploads wait for the first check. A failed check keeps the last known state and emails once a day.
+- Each alert is sent once: its key (e.g. `2026-10:storage:warn`) goes into `usage_alerts` before sending and is removed if sending fails, so restarts and multiple servers don't repeat it.
+
+The guard is off when `CLOUDFLARE_API_TOKEN` is empty. Email (`email.services.js`) goes through Resend's HTTP API; without a verified domain Resend only delivers to the account owner's address, which is enough for alerts but not for password reset emails to users.
 
 ---
 
@@ -224,6 +255,7 @@ This is the part of the system that needs the most care. The rules come from PRD
 - **`Wallet.balance`** is kept for fast reads, but every change to it is written together with its `WalletTransaction` row.
 - **`RescueFund`** is the PawAid Fund. It has a single row with a fixed id (`PAWAID_FUND_ID`, seeded by a migration) and tracks `total_available` (everything received) and `total_used` (everything given out).
 - **Amounts** are whole taka stored as `Int`. There are no floats and no sub-units.
+- **Reconciliation:** `findLedgerProblems` (`ledger.services.js`) checks that every wallet balance, post donation total and the PawAid Fund's totals match their transaction rows. The tests run it after each money flow, and `npm run check:ledger` (in `backend/`) runs it read-only against the database in `DATABASE_URL`.
 
 ### 5.2 Rules every money flow follows
 
@@ -289,7 +321,7 @@ Every admin write calls `logAdminAction(tx, adminId, { action, targetType, targe
 
 ## 6. Data Model
 
-23 Prisma models, grouped:
+26 Prisma models, grouped:
 
 | Group | Models |
 |---|---|
@@ -297,7 +329,7 @@ Every admin write calls `logAdminAction(tx, adminId, { action, targetType, targe
 | Community | `RescuePost`, `RescuePostImage`, `RescueUpdate`, `RescueUpdateImage`, `Comment`, `PostUpvote` (unique per user + post), `PostReport` |
 | Money | `Wallet` (one per user), `WalletTransaction`, `Payment`, `FinancialTransaction`, `Donation`, `RescueFund`, `RescueExpense` |
 | Marketplace | `ProductCategory`, `Product`, `Order`, `OrderItem` |
-| Infrastructure | `IdempotencyKey`, `AdminAuditLog` (append only) |
+| Infrastructure | `IdempotencyKey`, `AdminAuditLog` (append only), `Session`, `PasswordReset` (token hashes), `UsageAlert` (alert emails already sent) |
 
 Conventions:
 - UUID primary keys (`@db.Uuid`); snake_case table and column names through `@@map` / `@map`.
@@ -324,7 +356,8 @@ Schema changes go through Prisma migrations in `backend/prisma/migrations`. Some
 | `/marketplace`, `/marketplace/:productId` | Storefront and product page |
 | `/cart`, `/checkout`, `/orders/:orderId` | Cart, checkout, order details |
 | `/admin` | Admin dashboard, tabs selected by query string |
-| `/signin`, `/signup` | Auth |
+| `/signin`, `/signup` | Auth (email/password and Google) |
+| `/forgot-password`, `/reset-password` | Request a reset link; choose a new password (token read from the URL fragment) |
 
 ### 7.2 State and data fetching
 
@@ -351,7 +384,18 @@ Tailwind CSS 4. Newer screens (homepage, marketplace, transparency, admin) use t
 | `JWT_EXPIRY` | Token lifetime | `7d` |
 | `PORT` | API port | `3000` |
 | `CORS_ORIGIN` | Allowed frontend origin | `http://localhost:5173` |
+| `APP_URL` | Frontend address used in email links (password reset) | `CORS_ORIGIN` |
+| `TRUST_PROXY` | Number of proxies in front of the API, so rate limits see the real client IP | `0` |
+| `COOKIE_SECURE`, `COOKIE_SAME_SITE` | Login cookie flags: `true` in production; `none` when frontend and API are on different sites | `false`, `lax` |
+| `GOOGLE_CLIENT_ID` | OAuth client ID for Google sign-in (same as the frontend's `VITE_GOOGLE_CLIENT_ID`) | — (Google sign-in answers 503 without it) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Cloudflare R2 bucket for images | — |
+| `CLOUDFLARE_API_TOKEN` | Account Analytics: Read token for the R2 free tier guard | — (guard off) |
+| `R2_WARN_PERCENT`, `R2_BLOCK_PERCENT` | Free tier percentages for the warning email and the upload pause | `80`, `90` |
+| `RESEND_API_KEY` | Resend key for sending email | — (no email sent) |
+| `ALERT_EMAIL` | Where R2 usage alerts go | — |
+| `EMAIL_FROM` | Sender for all email; needs a domain verified in Resend to reach users | `PawAid <onboarding@resend.dev>` |
+
+`backend/.env.example` and `frontend/.env.example` list every variable with notes.
 
 The frontend's API base URL is hard-coded to `http://localhost:3000/api` in `frontend/src/services/api.js`.
 
@@ -364,9 +408,14 @@ cd ..
 npm run dev                  # API on :3000 and Vite on :5173, side by side
 ```
 
+Tests (`cd backend && npm test`) start their own embedded Postgres, apply the migrations and wipe it between tests; `tests/setup/each-file.js` refuses to run against anything but that local test database. External services (Google, Resend, Cloudflare) are faked in the tests that need them.
+
 ---
 
 ## 9. Known Gaps
 
-
+- **Rate limits and the R2 upload pause are per process.** Both live in memory, so with more than one API instance each keeps its own counts and state.
+- **The R2 guard counts by calendar month (UTC).** Cloudflare's free tier resets each billing month; if the billing cycle starts on a different day, the numbers can be slightly off. Storage is compared at its current size, while Cloudflare bills the month's average.
+- **Password reset emails need a verified Resend domain** before they reach anyone except the Resend account owner.
+- **The public donations list shows donor names and amounts** (`GET /donations`), which goes beyond the aggregated figures PRD §19/§41 describe. Undecided; see Tasks.md Stage 9.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.
