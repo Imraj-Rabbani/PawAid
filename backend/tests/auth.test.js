@@ -16,6 +16,8 @@ const PUBLIC_ROUTES = new Set([
   "POST /signin",
   "POST /signin/google",
   "POST /signout",
+  "POST /password/forgot",
+  "POST /password/reset",
   "GET /home/summary",
   "GET /transparency",
   "GET /marketplace/products",

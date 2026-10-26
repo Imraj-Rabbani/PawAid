@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/api';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { z } from "zod";
@@ -11,6 +11,8 @@ const loginSchema = z.object({
 
 const SignIn = () => {
   const navigate = useNavigate();
+  // e.g. "Your password has been reset", passed along by the reset page
+  const notice = useLocation().state?.message;
   const [searchParams] = useSearchParams();
   // only same-site paths, so the link can't send someone to another website
   const redirect = searchParams.get('redirect');
@@ -106,6 +108,12 @@ const SignIn = () => {
             </p>
           </div>
 
+          {notice && !serverError && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">{notice}</p>
+            </div>
+          )}
+
           {/* Server Error */}
           {serverError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -143,12 +151,20 @@ const SignIn = () => {
 
             {/* Password */}
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
-              >
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   id="password"

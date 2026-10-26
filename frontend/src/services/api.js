@@ -51,6 +51,15 @@ export const authService = {
   signOutEverywhere: async () => {
     await api.post('/signout/all');
   },
+  // emails a reset link; the reply is the same whether or not the email has an account
+  forgotPassword: async (email) => {
+    const response = await api.post('/password/forgot', { email });
+    return response.data;
+  },
+  resetPassword: async (token, password) => {
+    const response = await api.post('/password/reset', { token, password });
+    return response.data;
+  },
 };
 
 export default api;

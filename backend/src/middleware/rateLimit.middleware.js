@@ -53,6 +53,29 @@ export const googleSigninLimit = limiter({
     message: "Too many sign in attempts. Please try again in a few minutes.",
 })
 
+// "forgot password" requests from one IP; use before validateBody
+export const forgotPasswordIpLimit = limiter({
+    windowMs: 15 * MINUTE,
+    limit: 5,
+    message: "Too many password reset requests. Please try again in a few minutes.",
+})
+
+// reset emails to one address, from any IP, so nobody can flood someone's inbox;
+// use after validateBody so the email is there
+export const forgotPasswordEmailLimit = limiter({
+    windowMs: 60 * MINUTE,
+    limit: 3,
+    keyGenerator: (req) => req.body.email.toLowerCase(),
+    message: "Too many password reset requests for this email. Please try again later.",
+})
+
+// guesses at reset links from one IP
+export const resetPasswordLimit = limiter({
+    windowMs: 15 * MINUTE,
+    limit: 10,
+    message: "Too many attempts. Please try again in a few minutes.",
+})
+
 // one budget per user, shared by every money route; use after requireAuth
 export const moneyLimit = limiter({
     windowMs: MINUTE,

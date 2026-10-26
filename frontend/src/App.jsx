@@ -3,6 +3,8 @@ import './App.css'
 import Homepage from "./pages/Homepage"
 import SignIn from "./pages/Signin"
 import SignUp from "./pages/Signup"
+import ForgotPassword from "./pages/ForgotPassword"
+import ResetPassword from "./pages/ResetPassword"
 import ProfilePage from "./pages/ProfilePage"
 import AdminPage from "./pages/AdminPage"
 import VolunteersPage from "./pages/VolunteersPage"
@@ -38,6 +40,8 @@ function App() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/signin" element={<SignIn/>} />
         <Route path="/signup" element={<SignUp/>} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

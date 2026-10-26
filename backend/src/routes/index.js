@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { googleLogin, login, logout, logoutEverywhere, register } from "../modules/auth/auth.controller.js";
+import { forgotPassword, googleLogin, login, logout, logoutEverywhere, register, resetPasswordWithToken } from "../modules/auth/auth.controller.js";
 import { updateVolunteerProfile, volunteer, volunteerApplication, volunteerById, volunteers } from "../modules/volunteer/volunteer.controller.js";
 import { optionalAuth, requireAuth } from "../middleware/auth.middleware.js";
 import { addArea, assignPost, createPost, createRescueUpdate, deletePost, getPost, listAreas, listMyPosts, listPosts, listRescueUpdates, removeUpvote, updatePost, updatePostProgress, upvotePost } from "../modules/rescue/rescue.controller.js";
@@ -9,8 +9,8 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import { validateBody } from "../middleware/validate.middleware.js";
-import { googleSigninLimit, moneyLimit, signinEmailLimit, signinIpLimit, signupLimit } from "../middleware/rateLimit.middleware.js";
-import { googleLoginSchema, loginSchema, registerSchema } from "../schemas/auth.schemas.js";
+import { forgotPasswordEmailLimit, forgotPasswordIpLimit, googleSigninLimit, moneyLimit, resetPasswordLimit, signinEmailLimit, signinIpLimit, signupLimit } from "../middleware/rateLimit.middleware.js";
+import { forgotPasswordSchema, googleLoginSchema, loginSchema, registerSchema, resetPasswordSchema } from "../schemas/auth.schemas.js";
 import { profileSchema } from "../schemas/user.schemas.js";
 import { applicationSchema, volunteerUpdateSchema } from "../schemas/volunteer.schemas.js";
 import { addAreaSchema, postSchema, progressSchema, rescueUpdateSchema } from "../schemas/rescue.schemas.js";
@@ -46,6 +46,8 @@ router.post("/signin", signinIpLimit, validateBody(loginSchema), signinEmailLimi
 router.post("/signin/google", googleSigninLimit, validateBody(googleLoginSchema), googleLogin)
 router.post("/signout", logout)
 router.post("/signout/all", requireAuth, logoutEverywhere)
+router.post("/password/forgot", forgotPasswordIpLimit, validateBody(forgotPasswordSchema), forgotPasswordEmailLimit, forgotPassword)
+router.post("/password/reset", resetPasswordLimit, validateBody(resetPasswordSchema), resetPasswordWithToken)
 
 
 router.get("/profile/:userId", requireAuth, getUserProfile)

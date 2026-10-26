@@ -33,7 +33,10 @@ const env = {
     R2_BLOCK_PERCENT: Number(process.env.R2_BLOCK_PERCENT ?? 90),
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     ALERT_EMAIL: process.env.ALERT_EMAIL,
-    ALERT_EMAIL_FROM: process.env.ALERT_EMAIL_FROM ?? "PawAid <onboarding@resend.dev>",
+    // sender for every email the app sends (usage alerts, password resets)
+    EMAIL_FROM: process.env.EMAIL_FROM ?? "PawAid <onboarding@resend.dev>",
+    // the frontend's address, for links in emails
+    APP_URL: (process.env.APP_URL ?? process.env.CORS_ORIGIN ?? "http://localhost:5173").replace(/\/+$/, ""),
 }
 
 export default env;

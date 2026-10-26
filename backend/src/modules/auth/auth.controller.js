@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { clearAuthCookie, readToken, sanitizeUser, setAuthCookie, verifyToken } from "./auth.utils.js"
 import { createUser, endAllSessions, endSession, findOrCreateGoogleUser, findUser, startSession, verifyGoogleCredential } from "./auth.services.js";
+import { requestPasswordReset, resetPassword } from "./passwordReset.services.js";
 
 const INVALID_CREDENTIALS = "Invalid email or password"
 
@@ -118,4 +119,23 @@ export async function logoutEverywhere(req, res) {
     await endAllSessions(req.user.id)
     clearAuthCookie(res)
     return res.json({ message: "Signed out on every device" })
+}
+
+// Answers the same whether or not the email has an account, and sends the email
+// after replying, so neither the message nor the response time says who is registered
+export async function forgotPassword(req, res) {
+    res.json({ message: "If an account exists for that email, we've sent a link to reset the password." })
+
+    requestPasswordReset(req.body.email).catch((err) => console.error("Password reset email failed:", err))
+}
+
+export async function resetPasswordWithToken(req, res) {
+    const ok = await resetPassword(req.body.token, req.body.password)
+    if (!ok) {
+        return res.status(400).json({
+            message: "This reset link is invalid or has expired. Please request a new one.",
+        });
+    }
+
+    return res.json({ message: "Your password has been reset. Please sign in with your new password." })
 }
