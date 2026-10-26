@@ -1,4 +1,5 @@
 import multer from "multer";
+import { requireR2Capacity } from "../services/r2Usage.services.js";
 
 const storage = multer.memoryStorage();
 
@@ -55,8 +56,9 @@ function verifyImages(req, res, next) {
   next()
 }
 
-// same API as multer, but every upload is checked against its actual contents
+// same API as multer, but every upload is checked against its actual contents,
+// and refused up front while R2 is near its free tier limit
 export const upload = {
-  single: (field) => [parser.single(field), verifyImages],
-  array: (field, maxCount) => [parser.array(field, maxCount), verifyImages],
+  single: (field) => [requireR2Capacity, parser.single(field), verifyImages],
+  array: (field, maxCount) => [requireR2Capacity, parser.array(field, maxCount), verifyImages],
 };

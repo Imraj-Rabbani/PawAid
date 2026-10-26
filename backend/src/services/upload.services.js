@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import env from "../config/env.js";
+import { isR2UploadBlocked } from "./r2Usage.services.js";
 
 
 const r2 = new S3Client({
@@ -12,6 +13,8 @@ const r2 = new S3Client({
 });
 
 export async function uploadToR2(buffer, key, contentType) {
+  // routes refuse uploads earlier (upload.middleware.js), this catches any that don't go through it
+  if (isR2UploadBlocked()) throw new Error("R2 uploads are paused near the free tier limit");
   await r2.send(new PutObjectCommand({
     Bucket: env.R2_BUCKET_NAME,
     Key: key,

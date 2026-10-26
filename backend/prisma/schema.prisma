@@ -633,3 +633,11 @@ model Session {
   @@index([userId])
   @@map("sessions")
 }
+
+// One row per usage alert email already sent, keyed like "2026-10:storage:warn", so a
+// restart or a second server doesn't send it again. See services/r2Usage.services.js.
+model UsageAlert {
+  key String @id
+  sentAt DateTime @default(now()) @map("sent_at")
+  @@map("usage_alerts")
+}
