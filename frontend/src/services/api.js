@@ -31,13 +31,17 @@ export const updateStoredUser = (fields) => {
   localStorage.setItem('user', JSON.stringify({ ...stored, ...fields }));
 };
 
+// the Turnstile token for sign in and sign up; the backend checks it with Cloudflare
+const captchaHeaders = (captchaToken) =>
+  captchaToken ? { headers: { 'X-Captcha-Token': captchaToken } } : undefined;
+
 export const authService = {
-  signUp: async (userData) => {
-    const response = await api.post('/signup', userData);
+  signUp: async (userData, captchaToken) => {
+    const response = await api.post('/signup', userData, captchaHeaders(captchaToken));
     return response.data;
   },
-  signIn: async (credentials) => {
-    const response = await api.post('/signin', credentials);
+  signIn: async (credentials, captchaToken) => {
+    const response = await api.post('/signin', credentials, captchaHeaders(captchaToken));
     return response.data;
   },
   signInWithGoogle: async (credential) => {

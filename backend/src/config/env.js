@@ -22,6 +22,8 @@ const env = {
     COOKIE_SECURE: process.env.COOKIE_SECURE === "true",
     COOKIE_SAME_SITE: (process.env.COOKIE_SAME_SITE ?? "lax").toLowerCase(),
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    // Cloudflare Turnstile CAPTCHA on sign in and sign up; off while unset
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
     R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
     R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,

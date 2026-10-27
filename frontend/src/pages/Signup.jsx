@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { isCaptchaEnabled } from '../services/captcha';
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -21,7 +23,8 @@ const SignUp = () => {
     const [loading, setLoading] = useState(false);
     const [serverError, setServerError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-
+    const [captchaToken, setCaptchaToken] = useState('');
+    const captcha = useRef(null);
 
     const validateForm = () => {
         const result = registerSchema.safeParse(formData);
@@ -56,12 +59,12 @@ const SignUp = () => {
     
         setLoading(true);
         try {
-            const response = await authService.signUp(formData);
-    
+            const response = await authService.signUp(formData, captchaToken);
+
             if (response.user) {
                 localStorage.setItem('user', JSON.stringify(response.user));
             }
-    
+
             navigate('/');
         } catch (error) {
             const message =
@@ -69,6 +72,8 @@ const SignUp = () => {
                 error.message ||
                 'Something went wrong. Please try again.';
             setServerError(message);
+            // the token was used up, get a fresh one for the next try
+            captcha.current?.reset();
         } finally {
             setLoading(false);
         }
@@ -202,10 +207,12 @@ const SignUp = () => {
                             )}
                         </div>
 
+                        <TurnstileWidget ref={captcha} action="signup" onToken={setCaptchaToken} onError={setServerError} />
+
                         {/* Submit */}
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || (isCaptchaEnabled && !captchaToken)}
                             className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold py-2.5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center gap-2"
                         >
                             {loading ? (

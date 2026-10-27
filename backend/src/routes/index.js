@@ -9,6 +9,7 @@ import { requireAdmin } from "../middleware/admin.middleware.js";
 import { requireActiveVolunteer } from "../middleware/volunteer.middleware.js";
 import { requireIdempotencyKey } from "../middleware/idempotency.middleware.js";
 import { validateBody } from "../middleware/validate.middleware.js";
+import { requireCaptcha } from "../middleware/captcha.middleware.js";
 import { forgotPasswordEmailLimit, forgotPasswordIpLimit, googleSigninLimit, moneyLimit, resetPasswordLimit, signinEmailLimit, signinIpLimit, signupLimit } from "../middleware/rateLimit.middleware.js";
 import { forgotPasswordSchema, googleLoginSchema, loginSchema, registerSchema, resetPasswordSchema } from "../schemas/auth.schemas.js";
 import { profileSchema } from "../schemas/user.schemas.js";
@@ -41,8 +42,8 @@ import { createExpense, deleteExpense, listExpenses } from "../modules/expense/e
 
 const router = Router()
 
-router.post("/signup", signupLimit, validateBody(registerSchema), register)
-router.post("/signin", signinIpLimit, validateBody(loginSchema), signinEmailLimit, login)
+router.post("/signup", signupLimit, validateBody(registerSchema), requireCaptcha, register)
+router.post("/signin", signinIpLimit, validateBody(loginSchema), requireCaptcha, signinEmailLimit, login)
 router.post("/signin/google", googleSigninLimit, validateBody(googleLoginSchema), googleLogin)
 router.post("/signout", logout)
 router.post("/signout/all", requireAuth, logoutEverywhere)

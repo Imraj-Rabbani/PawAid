@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/api';
 import GoogleSignInButton from '../components/GoogleSignInButton';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { isCaptchaEnabled } from '../services/captcha';
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -25,6 +27,8 @@ const SignIn = () => {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captcha = useRef(null);
 
   const validateForm = () => {
     const result = loginSchema.safeParse(formData);
@@ -59,7 +63,7 @@ const SignIn = () => {
 
     setLoading(true);
     try {
-      const response = await authService.signIn(formData);
+      const response = await authService.signIn(formData, captchaToken);
 
       if (response.user) {
         localStorage.setItem('user', JSON.stringify(response.user));
@@ -72,6 +76,8 @@ const SignIn = () => {
         error.message ||
         'Invalid credentials. Please try again.';
       setServerError(message);
+      // the token was used up, get a fresh one for the next try
+      captcha.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -193,11 +199,12 @@ const SignIn = () => {
               )}
             </div>
 
+            <TurnstileWidget ref={captcha} action="signin" onToken={setCaptchaToken} onError={setServerError} />
 
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (isCaptchaEnabled && !captchaToken)}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold py-2.5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center gap-2"
             >
               {loading ? (
