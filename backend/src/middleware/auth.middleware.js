@@ -29,6 +29,7 @@ export async function requireAuth(req, res, next) {
             email: user.email,
             role: user.role,
             status: user.status,
+            areaId: user.areaId,
         };
 
         next()
@@ -55,6 +56,7 @@ export async function optionalAuth(req, res, next) {
                     email: user.email,
                     role: user.role,
                     status: user.status,
+                    areaId: user.areaId,
                 };
             }
         }

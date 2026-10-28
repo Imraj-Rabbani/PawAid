@@ -156,8 +156,11 @@ model User {
   profilePictureUrl String?    @map("profile_picture_url")
   address           String?
   phone             String?
+  // the area the user picked as theirs; the ranked feed puts its rescues first
+  areaId            String?    @map("area_id") @db.Uuid
   createdAt DateTime   @default(now()) @map("created_at")
 
+  area RescueArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
   volunteerProfile VolunteerProfile?
   wallet Wallet?
   rescuePosts RescuePost[] @relation("PostCreator")
@@ -180,6 +183,7 @@ model User {
 model RescueArea {
   id String @id @default(uuid()) @db.Uuid
   name String @unique
+  users User[]
   volunteers VolunteerProfile[]
   rescuePosts RescuePost[]
   @@map("rescue_areas")

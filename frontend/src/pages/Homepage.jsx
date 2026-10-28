@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import CreatePost from "../components/feed/CreatePost";
@@ -6,24 +7,31 @@ import PostCard from "../components/feed/PostCard";
 import ProfileSummaryCard from "../components/home/ProfileSummaryCard";
 import CommunitySidebar from "../components/home/CommunitySidebar";
 
-// value is sent to the backend as ?filter=
-const FILTERS = [
-  { value: "", label: "All Rescues" },
-  { value: "open", label: "Needs a Volunteer" },
-  { value: "fundraising", label: "Fundraising" },
-  { value: "rescued", label: "Rescued" },
+// params go to GET /rescue-post: "For You" is ranked (urgency, your area, funding
+// need, engagement), the rest are newest first
+const TABS = [
+  { key: "for_you", label: "For You", params: { sort: "ranked" } },
+  { key: "latest", label: "Latest", params: {} },
+  { key: "open", label: "Needs a Volunteer", params: { filter: "open" } },
+  { key: "fundraising", label: "Fundraising", params: { filter: "fundraising" } },
+  { key: "rescued", label: "Rescued", params: { filter: "rescued" } },
 ];
+const tabParams = (key) => TABS.find((tab) => tab.key === key).params;
+// tabs a brand new post (open, unassigned) belongs in
+const NEW_POST_TABS = ["for_you", "latest", "open"];
 
 export default function Homepage() {
   const user = JSON.parse(localStorage.getItem("user") || "null");
 
-  const [filter, setFilter] = useState("");
+  const [tab, setTab] = useState("for_you");
   const [posts, setPosts] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState(null);
+  // false when the ranked feed had no area to favour for this viewer
+  const [personalised, setPersonalised] = useState(true);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -38,15 +46,16 @@ export default function Homepage() {
   }, []);
 
   useEffect(() => {
-    // a slow response for an old filter must not overwrite the current one
+    // a slow response for an old tab must not overwrite the current one
     let ignore = false;
 
     const fetchPosts = async () => {
       try {
-        const res = await api.get("/rescue-post", { params: { filter: filter || undefined } });
+        const res = await api.get("/rescue-post", { params: tabParams(tab) });
         if (ignore) return;
         setPosts(res.data.data);
         setNextCursor(res.data.nextCursor);
+        setPersonalised(res.data.personalised ?? true);
       } catch (err) {
         console.error(err);
         if (!ignore) setError(err.response?.data?.message || "Failed to load posts");
@@ -59,15 +68,15 @@ export default function Homepage() {
     return () => {
       ignore = true;
     };
-  }, [filter]);
+  }, [tab]);
 
   const loadMore = async () => {
     try {
       setLoadingMore(true);
       const res = await api.get("/rescue-post", {
-        params: { cursor: nextCursor, filter: filter || undefined },
+        params: { ...tabParams(tab), cursor: nextCursor },
       });
-      // a post created since the last fetch can come back again, skip those
+      // a post created or re-ranked since the last fetch can come back again, skip those
       setPosts((prev) => {
         const seen = new Set(prev.map((post) => post.id));
         return [...prev, ...res.data.data.filter((post) => !seen.has(post.id))];
@@ -81,16 +90,15 @@ export default function Homepage() {
     }
   };
 
-  const changeFilter = (value) => {
-    if (value === filter) return;
+  const changeTab = (key) => {
+    if (key === tab) return;
     setLoading(true);
     setError("");
-    setFilter(value);
+    setTab(key);
   };
 
   const handleCreated = (post) => {
-    // a new post is open and unassigned, so it only belongs in these tabs
-    if (filter === "" || filter === "open") setPosts((prev) => [post, ...prev]);
+    if (NEW_POST_TABS.includes(tab)) setPosts((prev) => [post, ...prev]);
     setSummary((prev) =>
       prev?.me ? { ...prev, me: { ...prev.me, postCount: prev.me.postCount + 1 } } : prev
     );
@@ -122,13 +130,13 @@ export default function Homepage() {
           <main className="col-span-12 lg:col-span-6 flex flex-col gap-5">
             <div className="bg-surface-container-lowest p-4 rounded-2xl shadow-sm">
               <div className="flex items-center gap-2 overflow-x-auto">
-                {FILTERS.map((f) => {
-                  const active = filter === f.value;
+                {TABS.map((t) => {
+                  const active = tab === t.key;
                   return (
                     <button
-                      key={f.value}
+                      key={t.key}
                       type="button"
-                      onClick={() => changeFilter(f.value)}
+                      onClick={() => changeTab(t.key)}
                       aria-pressed={active}
                       className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] flex items-center gap-1 transition-colors ${
                         active
@@ -137,7 +145,7 @@ export default function Homepage() {
                       }`}
                     >
                       {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      {f.label}
+                      {t.label}
                     </button>
                   );
                 })}
@@ -145,6 +153,16 @@ export default function Homepage() {
             </div>
 
             <CreatePost user={user} onCreated={handleCreated} />
+
+            {tab === "for_you" && user && !personalised && !loading && (
+              <div className="bg-surface-container-lowest px-4 py-3 rounded-2xl shadow-sm text-sm text-on-surface-variant">
+                Choose your area on{" "}
+                <Link to={`/profile/${user.id}`} className="font-semibold text-primary hover:underline">
+                  your profile
+                </Link>{" "}
+                to see rescues near you first.
+              </div>
+            )}
 
             {loading ? (
               <p className="py-8 text-center text-on-surface-variant">Loading posts...</p>
@@ -155,9 +173,9 @@ export default function Homepage() {
             ) : posts.length === 0 ? (
               <div className="text-center py-16 text-on-surface-variant">
                 <p>
-                  {filter
-                    ? "No rescue posts match this filter."
-                    : "No rescue posts yet. Be the first to post one."}
+                  {tab === "for_you" || tab === "latest"
+                    ? "No rescue posts yet. Be the first to post one."
+                    : "No rescue posts match this filter."}
                 </p>
               </div>
             ) : (

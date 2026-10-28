@@ -31,18 +31,20 @@ export async function getUserProfile(req, res){
       // a malformed id makes the lookup throw, treat it the same as a missing user
       const user = await prisma.user.findUnique({
           where: {id : userId},
-          include: { wallet: true, volunteerProfile: { include: { rescueArea: true } } },
+          include: { area: true, wallet: true, volunteerProfile: { include: { rescueArea: true } } },
       }).catch(() => null)
 
       if (!user) {
           return res.status(404).json({ message: "User not found" });
       }
 
-      // Contact details, wallet and NID are only visible to their owner and admins
+      // Contact details, home area, wallet and NID are only visible to their owner and admins
       if (req.user.id !== user.id && req.user.role !== "ADMIN") {
           delete user.email
           delete user.phone
           delete user.address
+          delete user.areaId
+          delete user.area
           delete user.wallet
           if (user.volunteerProfile) delete user.volunteerProfile.nid
       }
@@ -69,6 +71,8 @@ export async function updateProfile(req, res){
         email: true,
         phone: true,
         address: true,
+        areaId: true,
+        area: true,
         role: true,
         profilePictureUrl: true,
         wallet: true,
@@ -79,6 +83,10 @@ export async function updateProfile(req, res){
     res.json(user)
 
   } catch (error) {
+    // the chosen area doesn't exist
+    if (error.code === "P2003") {
+      return res.status(400).json({ message: "Validation failed", errors: { areaId: ["Choose an area from the list."] } });
+    }
     console.error(error);
       res.status(500).json({ message: "Failed to update user profile" });
   }

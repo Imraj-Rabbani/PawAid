@@ -335,12 +335,30 @@ Received: ৳6,500
 Status: Awaiting Volunteer
 ```
 
-The homepage feed is paginated (cursor-based, newest first) and has filter tabs:
+The homepage feed is paginated (cursor-based) and has tabs:
 
-- **All Rescues**
-- **Needs a Volunteer** — open, unassigned posts
-- **Fundraising** — posts with a target that are still active
-- **Rescued** — resolved posts
+- **For You** (default) — ranked, see below
+- **Latest** — every rescue, newest first
+- **Needs a Volunteer** — open, unassigned posts, newest first
+- **Fundraising** — posts with a target that are still active, newest first
+- **Rescued** — resolved posts, newest first
+
+**For You ranking.** The aim is to put each rescue in front of the people most able to help while help still matters, not to maximise engagement. Each post's score is
+
+```
+status weight × area boost × (1 + funding boost + ln(1 + upvotes + 2·comments + 3·donors))
+─────────────────────────────────────────────────────────────────────────────────────────
+                               (age in hours + 2) ^ 1.5
+```
+
+- **Status weight:** open with no volunteer 3, assigned / in progress 1.5, rescued 0.5, closed 0.25.
+- **Area boost:** ×2 for a post in the viewer's area: the area they chose on their profile, otherwise their volunteer area. Guests and users without one get no boost and are invited to choose an area.
+- **Funding boost:** +0.5 while a post is still raising money, +1 once it is 60% or more of the way to its target.
+- **Engagement** is on a log scale so a popular post can't hold the top spot forever. Donors are people, not the PawAid Fund, and refunded donations don't count.
+- **Age:** an open post with no volunteer stops sinking after 24 hours, so it isn't buried while it still needs someone.
+- Taken down posts, posts by suspended users, and finished rescues older than 30 days are left out.
+
+The cursor fixes "now" at the first page, so later pages continue the same order. A user's area is private: other users never see it on their profile.
 
 Every rescue post also has its own details page (`/rescue/:postId`) with a photo gallery, donation card, volunteer card, updates, expenses and comments. The details page shows how many people donated, never who.
 

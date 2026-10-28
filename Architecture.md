@@ -193,7 +193,7 @@ All routes are under `/api` and defined in `src/routes/index.js`. Legend: 🔓 p
 | Users | `GET /profile/:userId` 👤 (contact details, wallet and NID only for the owner or an admin), `PUT /profile/update` 👤, `PUT /users/profile-picture` 👤 |
 | Home & transparency | `GET /home/summary` 🔓, `GET /transparency` 🔓 |
 | Areas | `GET /area` 🔓, `POST /add-area` 🛡️ |
-| Rescue posts | `GET /rescue-post` 🔓 (feed, `?filter=open\|fundraising\|rescued`, cursor paging), `GET /rescue-post/mine` 👤, `POST /rescue-post` 👤 (≤5 images), `GET /rescue-post/:postId` 🔓, `PUT` / `DELETE /rescue-post/:postId` 👤 creator |
+| Rescue posts | `GET /rescue-post` 🔓 (feed, `?filter=open\|fundraising\|rescued`, cursor paging; `?sort=ranked` is the For You feed, scored in `services/feed.services.js`), `GET /rescue-post/mine` 👤, `POST /rescue-post` 👤 (≤5 images), `GET /rescue-post/:postId` 🔓, `PUT` / `DELETE /rescue-post/:postId` 👤 creator |
 | Engagement | comments (`GET` 🔓, `POST` 👤, `DELETE /comments/:id` 👤), `POST`/`DELETE /rescue-post/:postId/upvote` 👤, `POST /rescue-post/:postId/report` 👤 |
 | Rescue work | `POST /rescue-post/:postId/assign` 🙋, `PATCH /rescue-post/:postId/progress` 🙋, updates (`GET` 🔓, `POST` 🙋 ≤4 images), expenses (`GET` 🔓, `POST` 🙋, `DELETE /expenses/:id` 🙋) |
 | Volunteers | `GET /volunteer` 🔓, `GET /volunteer/:id` 🔓, `POST /volunteer/apply` 👤, `GET`/`PUT /volunteer/profile` 👤/🙋 |
@@ -347,7 +347,7 @@ Schema changes go through Prisma migrations in `backend/prisma/migrations`. Some
 
 | Route | Page |
 |---|---|
-| `/` | Homepage: rescue feed with filter tabs, plus sidebars |
+| `/` | Homepage: rescue feed (For You ranked by default, Latest, filter tabs), plus sidebars |
 | `/rescue/:postId` | Rescue details |
 | `/profile/:userId` | Profile with tabs (profile, wallet, donations, orders, rescues, address) |
 | `/volunteers`, `/volunteers/:volunteerId` | Volunteer directory and public profile |

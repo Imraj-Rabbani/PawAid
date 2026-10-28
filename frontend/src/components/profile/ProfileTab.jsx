@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api, { updateStoredUser } from "../../services/api";
 import VolunteerForm from "./VolunteerForm";
 
@@ -8,16 +8,26 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
   const [form, setForm] = useState({
     name: user.name || "",
     phone: user.phone || "",
+    areaId: user.areaId || "",
   });
+  const [areas, setAreas] = useState([]);
   const [showVolunteerForm, setShowVolunteerForm] = useState(false);
   const [editingVolunteer, setEditingVolunteer] = useState(false);
+
+  // the choices for "My area"; only the owner sees or changes it
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    api.get("/area")
+      .then((res) => setAreas(res.data.data))
+      .catch((err) => console.error(err));
+  }, [isOwnProfile]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const res = await api.put("/profile/update", form);
+      const res = await api.put("/profile/update", { ...form, areaId: form.areaId || null });
       setUser((prev) => ({ ...prev, ...res.data }));
-      updateStoredUser({ name: res.data.name, phone: res.data.phone });
+      updateStoredUser({ name: res.data.name, phone: res.data.phone, areaId: res.data.areaId });
       setEditing(false);
     } catch (err) {
       console.error(err);
@@ -75,6 +85,26 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
           </Field>
         )}
 
+        {isOwnProfile && (
+          <Field label="My area">
+            {editing ? (
+              <select
+                value={form.areaId}
+                onChange={(e) => setForm({ ...form, areaId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">No area chosen</option>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.id}>{area.name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-gray-900">{user.area?.name || "—"}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">Rescues here come first in your feed. Only you can see this.</p>
+          </Field>
+        )}
+
         <Field label="Role">
           <p className="text-gray-900 capitalize">{user.role?.toLowerCase()}</p>
         </Field>
@@ -92,7 +122,7 @@ export default function ProfileTab({ user, setUser, isOwnProfile }) {
           <button
             onClick={() => {
               setEditing(false);
-              setForm({ name: user.name, phone: user.phone || "" });
+              setForm({ name: user.name, phone: user.phone || "", areaId: user.areaId || "" });
             }}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
           >

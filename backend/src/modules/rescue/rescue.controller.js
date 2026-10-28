@@ -5,6 +5,7 @@ import { creditWallet } from "../../services/wallet.services.js";
 import { NOT_REFUNDED } from "../donation/donation.controller.js";
 import { PROGRESS_FROM } from "../../schemas/rescue.schemas.js";
 import { logAdminAction } from "../../services/audit.services.js";
+import { decodeFeedCursor, rankPosts, viewerAreaId } from "../../services/feed.services.js";
 
 
 
@@ -139,6 +140,9 @@ const POST_FILTERS = {
 export async function listPosts(req, res){
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50)
+
+        if (req.query.sort === "ranked") return await listRankedPosts(req, res, limit)
+
         const cursor = z.uuid().safeParse(req.query.cursor)
         const where = Object.hasOwn(POST_FILTERS, req.query.filter) ? POST_FILTERS[req.query.filter] : HIDE_REMOVED
 
@@ -163,6 +167,28 @@ export async function listPosts(req, res){
         console.error(error);
         res.status(500).json({ message: "Failed to fetch posts" });
     }
+}
+
+// The "For you" feed (services/feed.services.js): ranked by urgency, the viewer's
+// area, funding need and engagement rather than by date. Filters don't apply here.
+async function listRankedPosts(req, res, limit) {
+    const areaId = await viewerAreaId(req.user)
+    const { ranked, nextCursor } = await rankPosts({ areaId, cursor: decodeFeedCursor(req.query.cursor), limit })
+
+    const posts = await prisma.rescuePost.findMany({
+        where: { id: { in: ranked.map((row) => row.id) } },
+        include: postIncludeFor(req.user?.id),
+    })
+    const byId = new Map(posts.map((post) => [post.id, post]))
+
+    return res.json({
+        message: "Posts listed",
+        // in ranked order; a post deleted since it was ranked is skipped
+        data: ranked.map((row) => byId.get(row.id)).filter(Boolean).map(withUpvoted),
+        nextCursor,
+        // false tells a signed in viewer that picking an area would put nearby rescues first
+        personalised: Boolean(areaId),
+    })
 }
 
 // One rescue for its own page. A taken down post stays visible to its creator
