@@ -181,6 +181,8 @@ A wallet with a zero balance is created for every user at sign up.
 
 Additional account information (phone, address, profile picture) can be added from the profile page after registration.
 
+Sign up and email/password sign in include a "verify you are human" check (Cloudflare Turnstile).
+
 Users can also sign up and sign in with Google. The Google account's email must be verified; if an email/password account already uses that email, the Google account is linked to it rather than creating a second account.
 
 ---
@@ -491,7 +493,7 @@ The volunteer's total donations received are visible publicly.
 - Volunteers can use wallet funds only within the PawAid marketplace.
 - Volunteers can transfer wallet funds to other volunteers.
 
-Users can see their own donation history (made, and for volunteers, received) on their profile. A public donations page lists recent donations across the platform.
+Users can see their own donation history (made, and for volunteers, received) on their profile. A public donations page lists recent donations across the platform, showing each donor's name, the amount, and the rescue or volunteer it went to. This is deliberate: naming donors lets the community see who is giving and check that money reached the rescue. Donors can't hide their name for now; an "anonymous" option is planned for after the MVP. PawAid Fund donations are listed as from the PawAid Fund, and refunded donations are shown struck through.
 
 ---
 
@@ -716,7 +718,7 @@ PawAid Fund
   Recent fund donations
 ```
 
-The overview shows aggregated numbers rather than individual donors' financial transactions.
+The overview shows aggregated numbers rather than individual donors' financial transactions. Individual donations, with donor names, are on the public donations page instead (§10).
 
 ---
 
@@ -1281,6 +1283,7 @@ Because the platform handles user identity and financial information, the backen
 - Server-side sessions: signing out, signing out of all devices, suspension and password resets revoke the login token immediately — **done**
 - CSRF protection for the login cookie (requests that change data need an `X-Requested-With` header) — **done**
 - Rate limiting on sign in, sign up, Google sign-in, password reset and money-moving routes — **done**
+- CAPTCHA (Cloudflare Turnstile) on email/password sign in and sign up, against bots and password guessing — **done**
 - Password reset by single-use, 30 minute emailed link; only a hash of the token is stored (§5.1.1) — **done**
 - Security headers (HSTS, nosniff, frame denial, strict content security policy) — **done**
 - Image storage kept inside the Cloudflare R2 free tier: the admin is emailed at 80% of the monthly allowance and uploads pause at 90% — **done**
@@ -1333,6 +1336,8 @@ Public users can view aggregated financial information:
 - PawAid Fund received, donated and remaining
 - Volunteer aggregate donation and wallet information
 - Documented rescue expenses
+
+They can also see individual donations on the public donations page: donor name, amount, recipient and date (§10). Wallet balances, wallet top ups, purchases and transfers of individual users are never public.
 
 ---
 
@@ -1417,6 +1422,7 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 - ✅ Duplicate-payment prevention
 - ✅ Audit logs for admin actions
 - ✅ Rate limiting, sessions, CSRF protection and security headers
+- ✅ CAPTCHA on sign in and sign up
 - 🟡 Automated tests: every flow and the ledger reconciliation are tested; a single end-to-end test of the §43 flow is still to be written
 
 ---

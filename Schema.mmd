@@ -1,31 +1,45 @@
 erDiagram
+    %% Kept in sync by hand with backend/prisma/schema.prisma, which is the source of truth.
+
+    USER ||--|| WALLET : has
     USER ||--o| VOLUNTEER_PROFILE : "becomes"
     USER ||--o{ RESCUE_POST : creates
     USER ||--o{ COMMENT : writes
+    USER ||--o{ POST_UPVOTE : gives
     USER ||--o{ POST_REPORT : files
     USER ||--o{ DONATION : makes
     USER ||--o{ ORDER : places
+    USER ||--o{ FINANCIAL_TRANSACTION : "related to"
+    USER ||--o{ SESSION : "signs in with"
+    USER ||--o{ PASSWORD_RESET : requests
+    USER ||--o{ IDEMPOTENCY_KEY : sends
+    USER ||--o{ ADMIN_AUDIT_LOG : "acts as admin in"
 
-
+    RESCUE_AREA |o--o{ USER : "chosen by"
     RESCUE_AREA ||--o{ VOLUNTEER_PROFILE : "based in"
     RESCUE_AREA ||--o{ RESCUE_POST : "located in"
 
-    VOLUNTEER_PROFILE ||--|| WALLET : has
     VOLUNTEER_PROFILE ||--o{ RESCUE_POST : "assigned to"
+    VOLUNTEER_PROFILE ||--o{ RESCUE_UPDATE : posts
     VOLUNTEER_PROFILE ||--o{ DONATION : receives
-    VOLUNTEER_PROFILE ||--o{ RESCUE_EXPENSE : incurs
+    VOLUNTEER_PROFILE ||--o{ RESCUE_EXPENSE : documents
+    VOLUNTEER_PROFILE ||--o{ FINANCIAL_TRANSACTION : "related to"
 
     RESCUE_POST ||--o{ RESCUE_POST_IMAGE : has
+    RESCUE_POST ||--o{ RESCUE_UPDATE : has
     RESCUE_POST ||--o{ COMMENT : has
+    RESCUE_POST ||--o{ POST_UPVOTE : receives
     RESCUE_POST ||--o{ POST_REPORT : "reported via"
     RESCUE_POST ||--o{ DONATION : receives
-    RESCUE_POST ||--o{ RESCUE_EXPENSE : "funds used for"
+    RESCUE_POST ||--o{ RESCUE_EXPENSE : "spent on"
+    RESCUE_POST ||--o{ FINANCIAL_TRANSACTION : "related to"
+
+    RESCUE_UPDATE ||--o{ RESCUE_UPDATE_IMAGE : has
 
     DONATION ||--|| PAYMENT : "paid via"
     DONATION ||--o| FINANCIAL_TRANSACTION : records
 
     WALLET ||--o{ WALLET_TRANSACTION : logs
-
     WALLET_TRANSACTION }o--|| FINANCIAL_TRANSACTION : "ledger entry for"
 
     PRODUCT_CATEGORY ||--o{ PRODUCT : contains
@@ -34,31 +48,35 @@ erDiagram
     ORDER ||--o{ ORDER_ITEM : contains
     ORDER ||--|| PAYMENT : "paid via"
     ORDER ||--o| FINANCIAL_TRANSACTION : records
+    ORDER |o--o{ RESCUE_EXPENSE : "backs"
 
     PAYMENT ||--o{ FINANCIAL_TRANSACTION : generates
 
     RESCUE_FUND ||--o{ FINANCIAL_TRANSACTION : "tracked by"
-    RESCUE_FUND ||--o{ RESCUE_EXPENSE : allocates
+    RESCUE_FUND ||--o{ DONATION : "donates as"
+    RESCUE_FUND ||--o{ RESCUE_EXPENSE : "linked to"
 
 
     USER {
         uuid id PK
         string name
         string email UK
-        string password
-        string role
-        string status
+        string password "null for Google-only accounts"
+        string google_id UK
+        string role "USER | VOLUNTEER | ADMIN"
+        string status "ACTIVE | INACTIVE | SUSPENDED"
+        string profile_picture_url
+        string address
+        string phone
+        uuid area_id FK "private; ranks the feed"
         datetime created_at
     }
 
     VOLUNTEER_PROFILE {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK,UK
         uuid rescue_area_id FK
-        string phone
-        string address
-        string profile_picture_url
-        string nid
+        string nid UK "never public"
         string description
         string status
         datetime created_at
@@ -66,7 +84,7 @@ erDiagram
 
     RESCUE_AREA {
         uuid id PK
-        string name
+        string name UK
     }
 
     RESCUE_POST {
@@ -79,6 +97,9 @@ erDiagram
         int donation_target
         int donation_received
         string status
+        text rescue_note
+        string rescue_photo_url
+        datetime resolved_at
         datetime created_at
     }
 
@@ -88,11 +109,32 @@ erDiagram
         string image_url
     }
 
+    RESCUE_UPDATE {
+        uuid id PK
+        uuid rescue_post_id FK
+        uuid volunteer_id FK
+        text note
+        datetime created_at
+    }
+
+    RESCUE_UPDATE_IMAGE {
+        uuid id PK
+        uuid rescue_update_id FK
+        string image_url
+    }
+
     COMMENT {
         uuid id PK
         uuid post_id FK
         uuid author_id FK
         text text
+        datetime created_at
+    }
+
+    POST_UPVOTE {
+        uuid id PK
+        uuid post_id FK "unique with user_id"
+        uuid user_id FK
         datetime created_at
     }
 
@@ -108,18 +150,19 @@ erDiagram
 
     DONATION {
         uuid id PK
-        uuid donor_id FK
+        uuid donor_id FK "exactly one of donor_id"
+        uuid rescue_fund_id FK "and rescue_fund_id"
         uuid rescue_post_id FK
         uuid volunteer_id FK
-        uuid payment_id FK
+        uuid payment_id FK,UK
         int amount
-        string destination_type
+        string destination_type "RESCUE_POST | VOLUNTEER"
         datetime created_at
     }
 
     WALLET {
         uuid id PK
-        uuid volunteer_id FK
+        uuid user_id FK,UK
         int balance
         datetime updated_at
     }
@@ -129,33 +172,39 @@ erDiagram
         uuid wallet_id FK
         uuid related_transaction_id FK
         int amount
-        string type
+        string type "CREDIT | DEBIT"
         string reference
         datetime created_at
     }
 
     PRODUCT_CATEGORY {
         uuid id PK
-        string name
+        string name UK
     }
 
     PRODUCT {
         uuid id PK
         uuid category_id FK
         string name
+        text description
+        string image_url
         int cost_price
         int selling_price
         int stock_qty
         boolean active
+        datetime created_at
     }
 
     ORDER {
         uuid id PK
         uuid buyer_id FK
-        uuid payment_id FK
+        uuid payment_id FK,UK
         int total_amount
         string payment_method
         string status
+        string delivery_name
+        string delivery_phone
+        string delivery_address
         datetime created_at
     }
 
@@ -165,6 +214,7 @@ erDiagram
         uuid product_id FK
         int quantity
         int unit_price
+        int unit_cost "snapshot at sale"
     }
 
     PAYMENT {
@@ -185,7 +235,10 @@ erDiagram
         uuid related_user_id FK
         uuid related_volunteer_id FK
         uuid related_post_id FK
-        uuid related_order_id FK
+        uuid related_order_id FK,UK
+        uuid payment_id FK
+        uuid donation_id FK,UK
+        uuid rescue_fund_id FK
         string status
         string reference
         datetime created_at
@@ -193,8 +246,8 @@ erDiagram
 
     RESCUE_FUND {
         uuid id PK
-        int total_available
-        int total_used
+        int total_available "everything received"
+        int total_used "everything given out"
         datetime updated_at
     }
 
@@ -203,9 +256,51 @@ erDiagram
         uuid volunteer_id FK
         uuid rescue_post_id FK
         uuid rescue_fund_id FK
+        uuid order_id FK
         int amount
         text description
+        string receipt_url
         datetime created_at
     }
 
-   
+    IDEMPOTENCY_KEY {
+        uuid id PK
+        uuid user_id FK "unique with key"
+        string key
+        string endpoint
+        string request_hash
+        int response_status
+        json response_body
+        datetime created_at
+    }
+
+    ADMIN_AUDIT_LOG {
+        uuid id PK
+        uuid admin_id FK
+        string action
+        string target_type
+        uuid target_id "no FK, outlives target"
+        string summary
+        json details
+        datetime created_at
+    }
+
+    SESSION {
+        uuid id PK
+        uuid user_id FK
+        datetime created_at
+        datetime expires_at
+    }
+
+    PASSWORD_RESET {
+        uuid id PK
+        uuid user_id FK
+        string token_hash UK
+        datetime expires_at
+        datetime created_at
+    }
+
+    USAGE_ALERT {
+        string key PK "e.g. 2026-10:storage:warn"
+        datetime sent_at
+    }

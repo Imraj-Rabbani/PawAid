@@ -91,6 +91,7 @@ PawAid/
 │       ├── middleware/
 │       │   ├── auth.middleware.js         # requireAuth, optionalAuth
 │       │   ├── csrf.middleware.js         # requireCsrfHeader
+│       │   ├── captcha.middleware.js      # requireCaptcha: Turnstile check on sign in and sign up
 │       │   ├── rateLimit.middleware.js    # per-route limits for auth and money routes
 │       │   ├── admin.middleware.js        # requireAdmin
 │       │   ├── volunteer.middleware.js    # requireActiveVolunteer
@@ -103,6 +104,8 @@ PawAid/
 │       │   ├── wallet.services.js   # creditWallet, debitWallet
 │       │   ├── fund.services.js     # PawAid Fund: creditFund, debitFund, refundFund
 │       │   ├── ledger.services.js   # findLedgerProblems: balances vs their transaction rows
+│       │   ├── feed.services.js     # For You feed: scores and orders rescue posts
+│       │   ├── captcha.services.js  # verifyCaptcha against Cloudflare Turnstile
 │       │   ├── payment.services.js  # simulated external provider (not wired in)
 │       │   ├── upload.services.js   # uploadToR2, deleteFromR2
 │       │   ├── r2Usage.services.js  # R2 free tier guard: usage check, alerts, upload pause
@@ -176,6 +179,7 @@ request
 - **CSRF:** `requireCsrfHeader` refuses any non-GET request that carries the cookie but not `X-Requested-With: XMLHttpRequest`. Another site can't add that header without passing CORS. Cookie flags come from `COOKIE_SECURE` and `COOKIE_SAME_SITE` (`none` when the frontend and API are on different sites).
 - **Google sign-in** (`POST /signin/google`): the browser sends the ID token from Google's button; the API verifies it against `GOOGLE_CLIENT_ID`, requires a verified email, and finds the user by `googleId`, links an existing account with the same email, or creates one. Google-only accounts have no password.
 - **Forgot password** (`POST /password/forgot`, `POST /password/reset`, `passwordReset.services.js`): the forgot route always gives the same reply and sends the email after responding, so neither the message nor the timing reveals whether the email is registered. The token is 32 random bytes; only its sha256 is stored in `password_resets`, with a 30 minute expiry, and a new request replaces the user's earlier rows. The link is `${APP_URL}/reset-password#token=…`: in the fragment so it never reaches a server log or a Referer header, and the page removes it from the address bar. The reset deletes the row inside a transaction (so two simultaneous uses can't both succeed), sets the password and ends all of the user's sessions.
+- **CAPTCHA** (`captcha.middleware.js`, `captcha.services.js`): `POST /signup` and `POST /signin` need an `X-Captcha-Token` header from the Cloudflare Turnstile widget, which the API checks with Cloudflare (`400` if missing or rejected, `503` if Cloudflare can't be reached). On sign in it runs before the per-email limit, so a bot without a solved CAPTCHA can't lock someone's account. Google sign-in doesn't need it, since Google already checks the person. Off while `TURNSTILE_SECRET_KEY` is unset (local dev, tests); the server logs a warning at startup.
 - **Rate limits** (`rateLimit.middleware.js`): sign in per IP and per email (failed attempts only), sign up and Google sign-in per IP, forgot password per IP and per email, reset per IP, and one budget per user across money routes. Counts are in memory, so they hold for one process and reset on restart; `TRUST_PROXY` must be set behind a proxy.
 - **`requireAuth`** verifies the token, checks its session, loads the user, and rejects anyone whose status isn't `ACTIVE` with a **401**. The frontend drops its cached user on any 401, so a suspended user is signed out on their next request.
 - **`optionalAuth`** is for public routes that show extra details to a signed-in viewer (e.g. whether they upvoted a post). A bad token just means "guest".
@@ -351,7 +355,7 @@ Schema changes go through Prisma migrations in `backend/prisma/migrations`. Some
 | `/rescue/:postId` | Rescue details |
 | `/profile/:userId` | Profile with tabs (profile, wallet, donations, orders, rescues, address) |
 | `/volunteers`, `/volunteers/:volunteerId` | Volunteer directory and public profile |
-| `/donations` | Public donation list |
+| `/donations` | Public donation list (donor names and amounts, by design) |
 | `/transparency` | Financial overview (admins can donate from the PawAid Fund here) |
 | `/marketplace`, `/marketplace/:productId` | Storefront and product page |
 | `/cart`, `/checkout`, `/orders/:orderId` | Cart, checkout, order details |
@@ -388,6 +392,7 @@ Tailwind CSS 4. Newer screens (homepage, marketplace, transparency, admin) use t
 | `TRUST_PROXY` | Number of proxies in front of the API, so rate limits see the real client IP | `0` |
 | `COOKIE_SECURE`, `COOKIE_SAME_SITE` | Login cookie flags: `true` in production; `none` when frontend and API are on different sites | `false`, `lax` |
 | `GOOGLE_CLIENT_ID` | OAuth client ID for Google sign-in (same as the frontend's `VITE_GOOGLE_CLIENT_ID`) | — (Google sign-in answers 503 without it) |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret for the sign in / sign up CAPTCHA (the frontend's `VITE_TURNSTILE_SITE_KEY` is the matching site key); set it in production | — (CAPTCHA off) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | Cloudflare R2 bucket for images | — |
 | `CLOUDFLARE_API_TOKEN` | Account Analytics: Read token for the R2 free tier guard | — (guard off) |
 | `R2_WARN_PERCENT`, `R2_BLOCK_PERCENT` | Free tier percentages for the warning email and the upload pause | `80`, `90` |
@@ -417,5 +422,4 @@ Tests (`cd backend && npm test`) start their own embedded Postgres, apply the mi
 - **Rate limits and the R2 upload pause are per process.** Both live in memory, so with more than one API instance each keeps its own counts and state.
 - **The R2 guard counts by calendar month (UTC).** Cloudflare's free tier resets each billing month; if the billing cycle starts on a different day, the numbers can be slightly off. Storage is compared at its current size, while Cloudflare bills the month's average.
 - **Password reset emails need a verified Resend domain** before they reach anyone except the Resend account owner.
-- **The public donations list shows donor names and amounts** (`GET /donations`), which goes beyond the aggregated figures PRD §19/§41 describe. Undecided; see Tasks.md Stage 9.
 - **The frontend API URL is hard-coded.** It should come from a Vite env variable (`VITE_API_URL`) before deploying.

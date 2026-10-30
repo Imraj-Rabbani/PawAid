@@ -1,6 +1,6 @@
 # PawAid — Build Plan
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-30
 
 | Stage | Status |
 | --- | --- |
@@ -29,7 +29,7 @@ This stage has no user-facing features yet — it's the skeleton everything else
 **Deliverables:**
 
 - [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 26 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey, AdminAuditLog, Session, UsageAlert, PasswordReset).
-- [x] Initial migration applied to PostgreSQL (17 migrations to date)
+- [x] Initial migration applied to PostgreSQL (18 migrations to date)
 - [~] `config/env.js` set up; the DB client lives in `src/db.js` (Prisma 7 with the `pg` adapter)
 - [~] JWT-based auth: register, login. Token in an httpOnly cookie, backed by a server-side session: `POST /signout` and `POST /signout/all` revoke it, and suspension ends all of a user's sessions; no refresh token, 7-day expiry instead (PRD D24)
 - [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
@@ -41,6 +41,7 @@ This stage has no user-facing features yet — it's the skeleton everything else
 - [x] Google sign-in (`POST /signin/google`): the ID token is verified server side; an existing email/password account with the same verified email is linked rather than duplicated
 - [x] Forgot password (`POST /password/forgot`, `POST /password/reset`, `/forgot-password`, `/reset-password`): emailed single-use link, 30 minute expiry, only a hash of the token stored, same reply whether or not the email has an account, rate limited per IP and per email, and a reset signs the account out everywhere. Google-only accounts can use it to add a password
 - [x] Email sending through Resend (`email.services.js`), used by password resets and the R2 usage alerts
+- [x] CAPTCHA on email/password sign in and sign up (Cloudflare Turnstile, `captcha.middleware.js`): the browser sends the widget's token in `X-Captcha-Token` and the API checks it with Cloudflare. On sign in it runs before the per-email rate limit, so bots can't lock someone's account. Off while `TURNSTILE_SECRET_KEY` is unset (local dev, tests)
 
 **Key considerations:**
 
@@ -92,7 +93,9 @@ This is the first user-visible feature. Wallet balance and donation totals on th
 **Added beyond the plan:**
 
 - [x] Post upvotes (one per user, toggle)
-- [x] Homepage feed with cursor pagination and tabs (All / Needs a Volunteer / Fundraising / Rescued)
+- [x] Homepage feed with cursor pagination and tabs (Latest / Needs a Volunteer / Fundraising / Rescued)
+- [x] Ranked "For You" feed, the default (`feed.services.js`, `?sort=ranked`): scored by status, the viewer's area, how close a fundraiser is to its target, and engagement (upvotes, comments, donors) on a log scale, with posts losing rank as they age; "Latest" keeps the newest-first order (PRD §8)
+- [x] User area: any user can choose their area on the profile page (`users.area_id`) so the feed puts rescues there first; volunteers fall back to their rescue area. Private to the owner
 - [x] Creator can edit/delete only while open and unassigned; no delete once donations exist (PRD D7)
 - [x] Volunteer progress: In Progress → Rescued with closing note and photo
 - [x] Rescue updates timeline (notes + up to 4 photos) by the assigned volunteer
@@ -226,7 +229,7 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 **Key considerations:**
 
 - Aggregates are computed from `FinancialTransaction` and related tables, not cached counters
-- Individual donor identities are kept out of the transparency overview. **But see the open item in Stage 9 about the public donations page.**
+- Individual donor identities are kept out of the transparency overview. The public donations page (`/donations`) shows donor names and amounts on purpose (PRD §10, §41)
 
 ---
 
@@ -245,7 +248,9 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Open items found while updating the docs:**
 
-- [ ] **Public donations page shows donor names and amounts** (`GET /api/donations`, `/donations`). This conflicts with PRD §41. Decide: hide donor identities, or allow it and add an "anonymous" option
+- [x] Public donations page shows donor names and amounts (`GET /api/donations`, `/donations`). Kept on purpose, so the community can see who gives; PRD §10 and §41 now say so. An "anonymous" option stays in Later
+- [x] CAPTCHA on sign in and sign up (see Stage 1)
+- [x] `Schema.mmd` brought up to date with `schema.prisma` (all 26 models). `Schema.png` still shows the old diagram and needs exporting again
 - [x] Reconciliation check and tests for the wallet/fund services (from Stage 4)
 - [x] `JWT_SECRET` is required (32+ characters); the server fails at startup without it
 - [x] Rate limiting on auth and money-moving routes (`rateLimit.middleware.js`; in-memory, so per process. Set `TRUST_PROXY` when deployed behind a proxy)
