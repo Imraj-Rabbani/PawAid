@@ -1,21 +1,20 @@
 # PawAid — Build Plan
 
-**Last updated:** 2026-10-30
+**Last updated:** 2026-10-31
 
-| Stage | Status |
-| --- | --- |
-| 1 — Foundation | ✅ Done (with changes) |
-| 2 — Volunteer System | ✅ Done |
-| 3 — Community / Rescue Posts | ✅ Done, extended |
-| 4 — Ledger Core | ✅ Done (with changes) |
-| 5 — Donations & Wallet | ✅ Done (with changes) |
-| 6 — Marketplace | ✅ Done (with changes) |
-| 7 — PawAid Fund (Rescue Fund) | ✅ Done (with changes) |
-| 8 — Financial Transparency & Admin Dashboard | ✅ Done |
-| 9 — Polish & Security Pass | 🟡 In progress |
+| Stage                                         | Status                 |
+| --------------------------------------------- | ---------------------- |
+| 1 — Foundation                               | ✅ Done (with changes) |
+| 2 — Volunteer System                         | ✅ Done                |
+| 3 — Community / Rescue Posts                 | ✅ Done, extended      |
+| 4 — Ledger Core                              | ✅ Done (with changes) |
+| 5 — Donations & Wallet                       | ✅ Done (with changes) |
+| 6 — Marketplace                              | ✅ Done (with changes) |
+| 7 — PawAid Fund (Rescue Fund)                | ✅ Done (with changes) |
+| 8 — Financial Transparency & Admin Dashboard | ✅ Done                |
+| 9 — Polish & Security Pass                   | ✅ Done                |
 
 Legend: `[x]` done · `[~]` done differently than planned (see note) · `[ ]` not done.
-"PRD Dn" refers to the Decision Log in PRD §44.
 
 ---
 
@@ -28,20 +27,23 @@ This stage has no user-facing features yet — it's the skeleton everything else
 
 **Deliverables:**
 
-- [x] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 26 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey, AdminAuditLog, Session, UsageAlert, PasswordReset).
-- [x] Initial migration applied to PostgreSQL (18 migrations to date)
+- [X] Prisma schema translated from the ER diagram — entities, relations, and enums (roles, statuses, transaction types). Now 26 models after later additions (RescueUpdate, RescueUpdateImage, PostUpvote, IdempotencyKey, AdminAuditLog, Session, UsageAlert, PasswordReset).
+- [X] Initial migration applied to PostgreSQL (18 migrations to date)
+
 - [~] `config/env.js` set up; the DB client lives in `src/db.js` (Prisma 7 with the `pg` adapter)
 - [~] JWT-based auth: register, login. Token in an httpOnly cookie, backed by a server-side session: `POST /signout` and `POST /signout/all` revoke it, and suspension ends all of a user's sessions; no refresh token, 7-day expiry instead (PRD D24)
 - [~] `auth.middleware.js` (`requireAuth`, `optionalAuth`). RBAC split into `admin.middleware.js` and `volunteer.middleware.js` instead of one `rbac.middleware.js`
-- [x] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
+
+- [X] Basic User CRUD (self-profile view/update, profile picture upload, admin list/suspend)
+
 - [~] Global error handler inline in `app.js` (`server.js` only starts the app, so tests can drive `app.js` directly). Zod body validation is shared middleware (`validateBody`, schemas in `src/schemas/`)
 
 **Added beyond the plan:**
 
-- [x] Google sign-in (`POST /signin/google`): the ID token is verified server side; an existing email/password account with the same verified email is linked rather than duplicated
-- [x] Forgot password (`POST /password/forgot`, `POST /password/reset`, `/forgot-password`, `/reset-password`): emailed single-use link, 30 minute expiry, only a hash of the token stored, same reply whether or not the email has an account, rate limited per IP and per email, and a reset signs the account out everywhere. Google-only accounts can use it to add a password
-- [x] Email sending through Resend (`email.services.js`), used by password resets and the R2 usage alerts
-- [x] CAPTCHA on email/password sign in and sign up (Cloudflare Turnstile, `captcha.middleware.js`): the browser sends the widget's token in `X-Captcha-Token` and the API checks it with Cloudflare. On sign in it runs before the per-email rate limit, so bots can't lock someone's account. Off while `TURNSTILE_SECRET_KEY` is unset (local dev, tests)
+- [X] Google sign-in (`POST /signin/google`): the ID token is verified server side; an existing email/password account with the same verified email is linked rather than duplicated
+- [X] Forgot password (`POST /password/forgot`, `POST /password/reset`, `/forgot-password`, `/reset-password`): emailed single-use link, 30 minute expiry, only a hash of the token stored, same reply whether or not the email has an account, rate limited per IP and per email, and a reset signs the account out everywhere. Google-only accounts can use it to add a password
+- [X] Email sending through Resend (`email.services.js`), used by password resets and the R2 usage alerts
+- [X] CAPTCHA on email/password sign in and sign up (Cloudflare Turnstile, `captcha.middleware.js`): the browser sends the widget's token in `X-Captcha-Token` and the API checks it with Cloudflare. On sign in it runs before the per-email rate limit, so bots can't lock someone's account. Off while `TURNSTILE_SECRET_KEY` is unset (local dev, tests)
 
 **Key considerations:**
 
@@ -61,12 +63,14 @@ This is the first user-visible feature. Wallet balance and donation totals on th
 
 **Deliverables:**
 
-- [x] RescueArea model + admin CRUD (add, rename, delete only if unused)
+- [X] RescueArea model + admin CRUD (add, rename, delete only if unused)
+
 - [~] Volunteer application endpoint: rescue area and NID required; phone, address, description optional; name/email/picture come from the account (PRD D4)
-- [x] Auto-activation on application (no admin approval step, per §5.2)
-- [x] Public volunteer profile page/endpoint (name, picture, description, area, status, donation totals, wallet totals and public wallet history)
-- [x] Volunteer directory: list + filter by rescue area
-- [x] Admin: revoke/restore volunteer status
+
+- [X] Auto-activation on application (no admin approval step, per §5.2)
+- [X] Public volunteer profile page/endpoint (name, picture, description, area, status, donation totals, wallet totals and public wallet history)
+- [X] Volunteer directory: list + filter by rescue area
+- [X] Admin: revoke/restore volunteer status
 
 **Key considerations:**
 
@@ -82,25 +86,29 @@ This is the first user-visible feature. Wallet balance and donation totals on th
 
 **Deliverables:**
 
-- [x] Rescue post CRUD (title, description, images, area, creator, optional donation target)
+- [X] Rescue post CRUD (title, description, images, area, creator, optional donation target)
+
 - [~] Image upload via R2 (up to 5 images per post)
-- [x] Comments (create, paginated list, delete by author or admin)
+
+- [X] Comments (create, paginated list, delete by author or admin)
+
 - [~] Post reporting (create report, admin review queue with PENDING/REVIEWED/RESOLVED/**REJECTED**) (PRD D9)
-- [x] Admin moderation: take down = status `CANCELLED`, financial records kept (PRD D10)
-- [x] Refund held donations when an admin moves a post with no volunteer out of `OPEN` (take down, Closed, Resolved); refunded donations excluded from all totals (PRD §11, §26)
-- [x] Post status lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED`, plus `CLOSED`/`CANCELLED` (PRD D6)
+
+- [X] Admin moderation: take down = status `CANCELLED`, financial records kept (PRD D10)
+- [X] Refund held donations when an admin moves a post with no volunteer out of `OPEN` (take down, Closed, Resolved); refunded donations excluded from all totals (PRD §11, §26)
+- [X] Post status lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED`, plus `CLOSED`/`CANCELLED` (PRD D6)
 
 **Added beyond the plan:**
 
-- [x] Post upvotes (one per user, toggle)
-- [x] Homepage feed with cursor pagination and tabs (Latest / Needs a Volunteer / Fundraising / Rescued)
-- [x] Ranked "For You" feed, the default (`feed.services.js`, `?sort=ranked`): scored by status, the viewer's area, how close a fundraiser is to its target, and engagement (upvotes, comments, donors) on a log scale, with posts losing rank as they age; "Latest" keeps the newest-first order (PRD §8)
-- [x] User area: any user can choose their area on the profile page (`users.area_id`) so the feed puts rescues there first; volunteers fall back to their rescue area. Private to the owner
-- [x] Creator can edit/delete only while open and unassigned; no delete once donations exist (PRD D7)
-- [x] Volunteer progress: In Progress → Rescued with closing note and photo
-- [x] Rescue updates timeline (notes + up to 4 photos) by the assigned volunteer
-- [x] Rescue details page (`/rescue/:postId`) with gallery, donation card, volunteer card, updates, expenses, comments
-- [x] "Rescues" tab on the profile page (posted / handling)
+- [X] Post upvotes (one per user, toggle)
+- [X] Homepage feed with cursor pagination and tabs (Latest / Needs a Volunteer / Fundraising / Rescued)
+- [X] Ranked "For You" feed, the default (`feed.services.js`, `?sort=ranked`): scored by status, the viewer's area, how close a fundraiser is to its target, and engagement (upvotes, comments, donors) on a log scale, with posts losing rank as they age; "Latest" keeps the newest-first order (PRD §8)
+- [X] User area: any user can choose their area on the profile page (`users.area_id`) so the feed puts rescues there first; volunteers fall back to their rescue area. Private to the owner
+- [X] Creator can edit/delete only while open and unassigned; no delete once donations exist (PRD D7)
+- [X] Volunteer progress: In Progress → Rescued with closing note and photo
+- [X] Rescue updates timeline (notes + up to 4 photos) by the assigned volunteer
+- [X] Rescue details page (`/rescue/:postId`) with gallery, donation card, volunteer card, updates, expenses, comments
+- [X] "Rescues" tab on the profile page (posted / handling)
 
 **Key considerations:**
 
@@ -121,7 +129,9 @@ Wallet balances must never be the sole source of truth (§31, §40). Instead of 
 - [~] Money as whole-taka integers (`Int` columns); no `money.util.js` needed since amounts are never fractional (PRD D21)
 - [~] `wallet.services.js` (`creditWallet`, `debitWallet` with an atomic balance check) and `fund.services.js` (`creditFund`, `debitFund`), always called inside a DB transaction
 - [~] `FinancialTransaction` + `WalletTransaction` write paths for the implemented types: INCOME, DONATION, TRANSFER, ORDER_PAYMENT, REFUND, MARKETPLACE_PROFIT, RESCUE_FUND_ALLOCATION (PRD D20)
-- [x] Reconciliation check: `findLedgerProblems` (`ledger.services.js`) compares wallet balances, post totals and the PawAid Fund against their transaction rows. Tests call it after every money flow, and `npm run check:ledger` runs it against a real database
+
+- [X] Reconciliation check: `findLedgerProblems` (`ledger.services.js`) compares wallet balances, post totals and the PawAid Fund against their transaction rows. Tests call it after every money flow, and `npm run check:ledger` runs it against a real database
+
 - [~] Wallet and fund services are tested through the API flows that use them (`donations`, `orders`, `ledger`, `concurrency` test files) rather than as isolated unit tests
 
 **Key considerations:**
@@ -142,19 +152,20 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Deliverables:**
 
-- [x] Donate-to-post endpoint (held on the post, or straight to the assigned volunteer's wallet)
-- [x] Donate-to-volunteer endpoint (direct wallet credit)
-- [x] Volunteer self-assign-to-post action → unassigned funds moved to wallet in the same transaction
-- [x] Wallet balance view + paginated transaction history with in/out totals
-- [x] Volunteer-to-volunteer transfer with optional note (§13)
-- [x] Volunteer profile shows real donation/wallet numbers
+- [X] Donate-to-post endpoint (held on the post, or straight to the assigned volunteer's wallet)
+- [X] Donate-to-volunteer endpoint (direct wallet credit)
+- [X] Volunteer self-assign-to-post action → unassigned funds moved to wallet in the same transaction
+- [X] Wallet balance view + paginated transaction history with in/out totals
+- [X] Volunteer-to-volunteer transfer with optional note (§13)
+- [X] Volunteer profile shows real donation/wallet numbers
 
 **Added / changed:**
 
 - [~] Every user has a wallet, created at sign up (migration `wallet_per_user`) (PRD D1)
 - [~] Donations are paid from the donor's wallet; demo wallet top up is the only way money enters (PRD D2)
-- [x] Self-donation rules: not to yourself, your own post, or a rescue you handle (PRD D3)
-- [x] Donation history: platform-wide `/donations` page and a Donations tab on the profile (made / received)
+
+- [X] Self-donation rules: not to yourself, your own post, or a rescue you handle (PRD D3)
+- [X] Donation history: platform-wide `/donations` page and a Donations tab on the profile (made / received)
 
 **Key considerations:**
 
@@ -169,21 +180,22 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Deliverables:**
 
-- [x] Product categories + products (cost price, selling price, stock, active flag, description, image)
-- [x] Admin product management (create/edit/deactivate; price can't be below cost) (PRD D15)
-- [x] Order + OrderItem creation, checkout flow (unit price and unit cost snapshotted)
+- [X] Product categories + products (cost price, selling price, stock, active flag, description, image)
+- [X] Admin product management (create/edit/deactivate; price can't be below cost) (PRD D15)
+- [X] Order + OrderItem creation, checkout flow (unit price and unit cost snapshotted)
+
 - [~] Payment paths: **cash on delivery** (everyone) and **wallet** (any user; frozen for revoked volunteers). Online/simulated external payment switched off (PRD D12)
 - [~] `payment.services.js` has a simulated provider behind an SSLCommerz-shaped interface, but it is not wired in
 - [~] Order status lifecycle: PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED, cancel any time before delivery; `REFUNDED` added (PRD D13, D14)
 
 **Added beyond the plan:**
 
-- [x] Storefront and product details page with category filter and "you may also like"
-- [x] Cart (browser storage, per user, re-synced with server prices/stock) (PRD D16)
-- [x] Address management on the profile; delivery details snapshotted on each order
-- [x] Price-change check at checkout (`expectedTotal`)
-- [x] Cancelling restocks items and refunds wallet payments through the ledger
-- [x] Orders tab on the profile + order details page
+- [X] Storefront and product details page with category filter and "you may also like"
+- [X] Cart (browser storage, per user, re-synced with server prices/stock) (PRD D16)
+- [X] Address management on the profile; delivery details snapshotted on each order
+- [X] Price-change check at checkout (`expectedTotal`)
+- [X] Cancelling restocks items and refunds wallet payments through the ledger
+- [X] Orders tab on the profile + order details page
 
 **Key considerations:**
 
@@ -199,7 +211,9 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 **Deliverables:**
 
 - [~] Profit posted when an order is marked **Delivered** (per item: (unit price − unit cost) × quantity) (PRD D17)
-- [x] Single `RescueFund` row (the PawAid Fund) tracking total received (`total_available`) and total given (`total_used`)
+
+- [X] Single `RescueFund` row (the PawAid Fund) tracking total received (`total_available`) and total given (`total_used`)
+
 - [~] Admin allocation is a **donation from the fund** to a volunteer or a rescue post, recorded as `RESCUE_FUND_ALLOCATION` and naming the admin (PRD D18)
 - [~] Rescue expense documentation: the assigned volunteer records expenses with a receipt photo and/or a linked marketplace order. Documentation only, no money moves (PRD D19)
 
@@ -216,15 +230,15 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Deliverables:**
 
-- [x] Public financial overview (`/transparency`): donations, top ups, volunteer funds, rescues, documented expenses, marketplace revenue/profit, PawAid Fund received/donated/balance, recent fund donations
-- [x] Admin dashboard overview metrics
-- [x] Admin user management (search, view, suspend/reactivate)
-- [x] Admin volunteer management (search/filter, view profiles incl. NID, revoke/restore, view wallets read-only)
-- [x] Admin order management (filter, view, update status)
-- [x] Admin post moderation + report queue
-- [x] Admin area management
-- [x] Admin read-only ledger (Transactions tab)
-- [x] Homepage sidebars (platform totals, top volunteers this month, volunteers to discover, viewer's own summary)
+- [X] Public financial overview (`/transparency`): donations, top ups, volunteer funds, rescues, documented expenses, marketplace revenue/profit, PawAid Fund received/donated/balance, recent fund donations
+- [X] Admin dashboard overview metrics
+- [X] Admin user management (search, view, suspend/reactivate)
+- [X] Admin volunteer management (search/filter, view profiles incl. NID, revoke/restore, view wallets read-only)
+- [X] Admin order management (filter, view, update status)
+- [X] Admin post moderation + report queue
+- [X] Admin area management
+- [X] Admin read-only ledger (Transactions tab)
+- [X] Homepage sidebars (platform totals, top volunteers this month, volunteers to discover, viewer's own summary)
 
 **Key considerations:**
 
@@ -239,26 +253,26 @@ The critical flow is the unassigned-funds handoff (§9): a donation to a post wi
 
 **Deliverables:**
 
-- [x] Audit logs for admin actions: every admin write (suspend, revoke, post status / take down, reports, areas, categories, products, order status, fund donations) writes an `AdminAuditLog` row in the same transaction; the table is append only (DB trigger) and shown in the admin panel's Audit Log tab
-- [x] Duplicate-payment prevention: `Idempotency-Key` required on top up, donations, transfers, checkout and fund donations (PRD D22)
-- [x] File upload validation: JPEG, PNG, GIF or WebP only, checked by magic bytes (the declared MIME type is not trusted), 5 MB, per-route file counts; the frontend pickers check the type too
-- [x] NID never appears in any public or list response (admin volunteer list only)
-- [x] Every multi-step financial operation wrapped in a DB transaction
-- [ ] End-to-end test of the full MVP success flow (PRD §43). Each step is covered by its own tests, but no single test runs the whole chain: register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview
+- [X] Audit logs for admin actions: every admin write (suspend, revoke, post status / take down, reports, areas, categories, products, order status, fund donations) writes an `AdminAuditLog` row in the same transaction; the table is append only (DB trigger) and shown in the admin panel's Audit Log tab
+- [X] Duplicate-payment prevention: `Idempotency-Key` required on top up, donations, transfers, checkout and fund donations (PRD D22)
+- [X] File upload validation: JPEG, PNG, GIF or WebP only, checked by magic bytes (the declared MIME type is not trusted), 5 MB, per-route file counts; the frontend pickers check the type too
+- [X] NID never appears in any public or list response (admin volunteer list only)
+- [X] Every multi-step financial operation wrapped in a DB transaction
+- [X] End-to-end test of the full MVP success flow (PRD §43), `tests/mvp-flow.test.js`: register → post → top up → donate → assign → wallet → purchase → deliver → profit → fund → public overview, all through the API with the login cookie, then a ledger reconciliation check
 
 **Open items found while updating the docs:**
 
-- [x] Public donations page shows donor names and amounts (`GET /api/donations`, `/donations`). Kept on purpose, so the community can see who gives; PRD §10 and §41 now say so. An "anonymous" option stays in Later
-- [x] CAPTCHA on sign in and sign up (see Stage 1)
-- [x] `Schema.mmd` brought up to date with `schema.prisma` (all 26 models). `Schema.png` still shows the old diagram and needs exporting again
-- [x] Reconciliation check and tests for the wallet/fund services (from Stage 4)
-- [x] `JWT_SECRET` is required (32+ characters); the server fails at startup without it
-- [x] Rate limiting on auth and money-moving routes (`rateLimit.middleware.js`; in-memory, so per process. Set `TRUST_PROXY` when deployed behind a proxy)
-- [x] Update `Architecture.md` to match the code (R2, the wallet/fund services, the split RBAC middleware, the real folder layout)
-- [x] Sessions: the login token is an httpOnly cookie backed by a `Session` row, so sign out, sign out everywhere, suspension and password resets revoke it on the server. Changes need an `X-Requested-With` header (CSRF)
-- [x] Security headers with `helmet` (HSTS, nosniff, frame denial, strict CSP)
-- [x] R2 free tier guard: usage read from Cloudflare's analytics API every 15 minutes; email at `R2_WARN_PERCENT` (80%), uploads refused with a 503 at `R2_BLOCK_PERCENT` (90%) of storage or Class A operations. Image reads from the public bucket can't be stopped by the server, so they only trigger an email
-- [x] Forgot password flow (see Stage 1)
+- [X] Public donations page shows donor names and amounts (`GET /api/donations`, `/donations`). Kept on purpose, so the community can see who gives; PRD §10 and §41 now say so. An "anonymous" option stays in Later
+- [X] CAPTCHA on sign in and sign up (see Stage 1)
+- [X] `Schema.mmd` brought up to date with `schema.prisma` (all 26 models). `Schema.png` still shows the old diagram and needs exporting again
+- [X] Reconciliation check and tests for the wallet/fund services (from Stage 4)
+- [X] `JWT_SECRET` is required (32+ characters); the server fails at startup without it
+- [X] Rate limiting on auth and money-moving routes (`rateLimit.middleware.js`; in-memory, so per process. Set `TRUST_PROXY` when deployed behind a proxy)
+- [X] Update `Architecture.md` to match the code (R2, the wallet/fund services, the split RBAC middleware, the real folder layout)
+- [X] Sessions: the login token is an httpOnly cookie backed by a `Session` row, so sign out, sign out everywhere, suspension and password resets revoke it on the server. Changes need an `X-Requested-With` header (CSRF)
+- [X] Security headers with `helmet` (HSTS, nosniff, frame denial, strict CSP)
+- [X] R2 free tier guard: usage read from Cloudflare's analytics API every 15 minutes; email at `R2_WARN_PERCENT` (80%), uploads refused with a 503 at `R2_BLOCK_PERCENT` (90%) of storage or Class A operations. Image reads from the public bucket can't be stopped by the server, so they only trigger an email
+- [X] Forgot password flow (see Stage 1)
 
 **Key considerations:**
 

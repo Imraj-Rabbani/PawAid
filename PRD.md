@@ -1423,7 +1423,7 @@ Status key: ✅ built · 🟡 partly built / changed · ⬜ not built
 - ✅ Audit logs for admin actions
 - ✅ Rate limiting, sessions, CSRF protection and security headers
 - ✅ CAPTCHA on sign in and sign up
-- 🟡 Automated tests: every flow and the ledger reconciliation are tested; a single end-to-end test of the §43 flow is still to be written
+- ✅ Automated tests: every flow and the ledger reconciliation are tested, plus an end-to-end test of the §43 flow
 
 ---
 
@@ -1461,6 +1461,6 @@ Profit goes into the PawAid Fund
 Users can view the updated financial overview
 ```
 
-If this end-to-end flow works correctly, the core PawAid concept is functioning. Every step is implemented; an automated end-to-end test of the flow is still to be written.
+If this end-to-end flow works correctly, the core PawAid concept is functioning. Every step is implemented, and `backend/tests/mvp-flow.test.js` runs the whole flow through the API.
 
 ---
